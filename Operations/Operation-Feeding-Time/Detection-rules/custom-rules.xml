@@ -1,0 +1,180 @@
+<!--
+  =============================================================================
+  OPERATION Feeding_Time — WAZUH DETECTION RULES
+  =============================================================================
+  Simulated kill chain: Phishing → Macro → PowerShell → Credential Dump 
+                        → Lateral Movement → Exfiltration
+  
+  Environment:  Proxmox SOC Lab | VLAN 10 (internal) | VLAN 30 (DMZ)
+  Platform:     Wazuh 4.14.5 + Sysmon + Windows Server 2022
+  Coverage:     Initial Access, Execution, Persistence, Defense Evasion,
+                Credential Access, Lateral Movement, Exfiltration
+  
+  Author:  Pahoeh0e
+  Date:    2026-07-11
+  Version: 1.1
+  =============================================================================
+  TESTED AGAINST LIVE EVENTS — See test-events.ps1 for validation workflow
+  =============================================================================
+-->
+
+<group name="sysmon_custom,">
+
+  <!-- =========================================================================
+       SYSMON EVENT ID 1: PROCESS CREATION — ENHANCED DETECTIONS
+       Default Wazuh parent group: sysmon_event1
+       These rules add: LOLBAS execution, suspicious parent-child relationships,
+       and MITRE-mapped behavioral detections.
+       ======================================================================== -->
+
+  <!-- DET-001: PowerShell suspicious parameters -->
+  <rule id="100005" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\powershell\.exe$|\\pwsh\.exe$|\\powershell_ise\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">-enc| -e |FromBase64|Invoke-Expression|IEX|DownloadString|Net\.WebClient</field>
+    <description>Sysmon: PowerShell with suspicious parameters - possible obfuscation (T1059.001)</description>
+    <mitre>
+      <id>T1059.001</id>
+      <id>T1027</id>
+      <id>T1105</id>
+    </mitre>
+    <group>sysmon_custom,powershell,command_and_scripting_interpreter,</group>
+  </rule>
+
+  <!-- DET-002: Office spawning cmd.exe -->
+  <rule id="100006" level="14">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\cmd\.exe$</field>
+    <field name="win.eventdata.parentImage" type="pcre2">\\winword\.exe$|\\excel\.exe$|\\powerpnt\.exe$|\\outlook\.exe$</field>
+    <description>Sysmon: Office application spawning cmd.exe - possible macro execution (T1566.001)</description>
+    <mitre>
+      <id>T1566.001</id>
+      <id>T1059.003</id>
+    </mitre>
+    <group>sysmon_custom,office_macro,phishing,command_and_scripting_interpreter,</group>
+  </rule>
+
+
+  <!-- DET-003: Netsh firewall/helper modification -->
+  <rule id="100010" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\netsh\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">advfirewall|firewall|add helper</field>
+    <description>Sysmon: Netsh modifying firewall or adding helper DLL (T1562.004/T1128)</description>
+    <mitre>
+      <id>T1562.004</id>
+      <id>T1128</id>
+    </mitre>
+    <group>sysmon_custom,firewall,impair_defenses,</group>
+  </rule>
+
+  <!-- DET-0004: Event log clearing -->
+  <rule id="100011" level="12">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\wevtutil\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">cl|clear-log|sl|set-log</field>
+    <description>Sysmon: Event log clearing or modification (T1070.001)</description>
+    <mitre>
+      <id>T1070.001</id>
+    </mitre>
+    <group>sysmon_custom,indicator_removal,clear_logs,</group>
+  </rule>
+
+ 
+  <!-- DET-005: Scheduled task creation -->
+  <rule id="100014" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\schtasks\.exe$|\\at\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">create|/run|/change</field>
+    <description>Sysmon: Scheduled task creation or modification (T1053.005/T1053.002)</description>
+    <mitre>
+      <id>T1053.005</id>
+      <id>T1053.002</id>
+    </mitre>
+    <group>sysmon_custom,scheduled_task,persistence,</group>
+  </rule>
+
+  <!-- DET-006: Credential dumping tools -->
+  <rule id="100015" level="12">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\procdump\.exe$|\\procdump64\.exe$|\\lsadump\.exe$|\\mimikatz\.exe$|\\mimilib\.dll$|\\sekurlsa::</field>
+    <description>Sysmon: Credential dumping tool execution (T1003)</description>
+    <mitre>
+      <id>T1003</id>
+      <id>T1003.001</id>
+    </mitre>
+    <group>sysmon_custom,credential_dumping,os_credential_dumping,</group>
+  </rule>
+
+  <!-- DET-007: PsExec lateral movement -->
+  <rule id="100016" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\psexec\.exe$|\\psexec64\.exe$|\\psexesvc\.exe$|\\paexec\.exe$|\\csexec\.exe$</field>
+    <description>Sysmon: PsExec or variant execution - lateral movement (T1569.002/T1021.002)</description>
+    <mitre>
+      <id>T1569.002</id>
+      <id>T1021.002</id>
+    </mitre>
+    <group>sysmon_custom,psexec,lateral_movement,remote_services,</group>
+  </rule>
+
+ 
+  <!-- =========================================================================
+       SYSMON EVENT ID 3: NETWORK CONNECTION — C2 AND LATERAL MOVEMENT
+       Default Wazuh parent group: sysmon_event3
+       ======================================================================== -->
+
+  
+
+  <!-- DET-101: LOLBAS tools making network connections -->
+  <rule id="100105" level="10">
+    <if_group>sysmon_event3</if_group>
+    <field name="win.eventdata.image" type="pcre2">\\certutil\.exe$|\\bitsadmin\.exe$|\\esentutl\.exe$</field>
+    <description>Sysmon: LOLBAS tool making network connection - possible download (T1105/T1218)</description>
+    <mitre>
+      <id>T1105</id>
+      <id>T1218</id>
+    </mitre>
+    <group>sysmon_custom,loLBAS,ingress_tool_transfer,system_binary_proxy_execution,</group>
+  </rule>
+
+
+  <!-- =========================================================================
+       SYSMON EVENT ID 10: PROCESS ACCESS — CREDENTIAL DUMPING
+       Default Wazuh parent group: sysmon_event_10 (underscore for 10+)
+       ======================================================================== -->
+
+  <!-- DET-400: LSASS accessed with dump permissions by known tool -->
+  <rule id="100400" level="14">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.targetImage" type="pcre2">\\lsass\.exe$</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">0x1010|0x143A|0x1410|0x1FFFFF|0x1F1FFF|0x1F0FFF</field>
+    <field name="win.eventdata.sourceImage" type="pcre2">\\procdump\.exe$|\\procdump64\.exe$|\\taskmgr\.exe$|\\rundll32\.exe$|\\comsvcs\.dll$</field>
+    <description>Sysmon: LSASS accessed with dump permissions by known tool (T1003.001)</description>
+    <mitre>
+      <id>T1003.001</id>
+    </mitre>
+    <group>sysmon_custom,credential_dumping,lsass_memory,</group>
+  </rule>
+
+  
+  <!-- =========================================================================
+       SYSMON EVENT ID 17/18: PIPE EVENTS — PSEXEC 
+       Default Wazuh parent groups: sysmon_event_17, sysmon_event_18
+       ======================================================================== -->
+
+  
+
+  <!-- DET-502: PsExec pipe detection -->
+  <rule id="100502" level="13">
+    <if_group>sysmon_event_17,sysmon_event_18</if_group>
+    <field name="win.eventdata.pipeName" type="pcre2">\\PSEXESVC|\\paexec|\\remcom|\\csexec</field>
+    <description>Sysmon: PsExec or variant pipe detected - lateral movement (T1021.002/T1569.002)</description>
+    <mitre>
+      <id>T1021.002</id>
+      <id>T1569.002</id>
+    </mitre>
+    <group>sysmon_custom,psexec,lateral_movement,smb_windows_admin_shares,</group>
+  </rule>
+
+</group>
