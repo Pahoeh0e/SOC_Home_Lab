@@ -6,7 +6,7 @@
 
 ## 📑 Table of Contents
 - [Executive Summary](#executive-summary)
-- [Architecture](#architecture.md)
+- [Architecture](#architecture)
 - [Technologies Used](#technologies-used)
 - [Detection Capabilities](#detection-capabilities)
 - [Attack Scenarios](#attack-scenarios)
