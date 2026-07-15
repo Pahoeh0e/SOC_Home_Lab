@@ -46,7 +46,7 @@ that mirror real-world APT behavior:
 | 4 | CertUtil download | Wazuh 100001 |
 | 5 | BITSAdmin exfiltration | Wazuh 100018 |
 
-![Powershell](Screenshots/Windows_macro_1.png)
+![Powershell](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Windows_macro_3.png)
 ![Powershell](Screenshots/Windows_macro_2.png)
 ![Powershell](Screenshots/Windows_macro_3.png)
 
