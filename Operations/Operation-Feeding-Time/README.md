@@ -37,7 +37,7 @@ the payload, triggering the full kill chain:
 # This script executes the same TTPs as a real APT attachment
 # but uses benign commands for lab safety
 
-.\Invoice-2026-7843.ps1
+(.\Invoice-2026-7843.ps1)[SOC_Home_Lab/Operations/Operation-Feeding-Time/Detections/Invoice-2026-7843.ps1]
 ```
 
 ### Execution
@@ -77,6 +77,9 @@ upon script execution, detecting:
 **Wazuh Rule 100001** (CertUtil execution) + **Rule 100105** (LOLBAS network 
 connection) fire in sequence when the payload downloads from 
 `192.168.30.12:8080`.
+
+[SOC_Home_Lab/Operations/Operation-Feeding-Time/Screenshots/Splunk_Feeding_Time_1]
+
 
 Splunk correlates both alerts with Nginx access logs, confirming:
 - Which payload was requested (`/payload.txt`, `/stage.ps1`)
