@@ -85,7 +85,6 @@ Splunk correlates both alerts with Nginx access logs, confirming:
 - HTTP status code (200 = successful download)
 
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_3.png)
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_4.png)
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_5.png)
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_6.png)
 
@@ -99,6 +98,8 @@ Each alert contributes to a cumulative risk score:
 - Level 8-9 alerts (suspicious DNS): **3 points**
 
 A host scoring **20+** is flagged **CRITICAL** in the Splunk dashboard.
+
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_4.png)
 
 ---
 
