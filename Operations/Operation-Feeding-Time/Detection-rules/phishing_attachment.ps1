@@ -1,13 +1,16 @@
 <#
 .SYNOPSIS
-    Operation Feeding_Time - Test Event Generator
+    Invoice Processing Script
 .DESCRIPTION
-    Triggers a simulated kill chain across 10 Wazuh custom rules.
-    Run as Administrator. Clean up after each phase with -Cleanup.
+    Automated invoice processing for Q3 2026.
+    Run this script to generate your payment summary.
 .NOTES
-    Author: Pahoeh0e
-    Lab: Proxmox SOC (VLAN 10 internal, VLAN 30 DMZ)
+    From: accounts@shadowdrop-finance.com
+    Subject: URGENT: Outstanding Invoice #INV-2026-7843
+    Date: 2026-07-15
 #>
+
+# --- PAYLOAD BEGINS ---
 
 param([switch]$Cleanup)
 
