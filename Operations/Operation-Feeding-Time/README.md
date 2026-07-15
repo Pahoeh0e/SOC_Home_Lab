@@ -19,3 +19,22 @@ This repository implements detection logic for each phase using:
 ### Validation
 Every rule was tested against live events in a Proxmox-based SOC lab
 with VLAN-segmented networks (VLAN 10 internal, VLAN 30 DMZ).
+
+## Delivery: Phishing Attachment
+
+The attack begins with a spear-phishing email containing a malicious 
+PowerShell script disguised as an invoice:
+
+**Filename:** `Invoice-2026-7843.ps1`  
+**Subject:** URGENT: Outstanding Invoice #INV-2026-7843  
+**Sender:** accounts@shadowdrop-finance.com  
+
+When the victim double-clicks the attachment, Windows Script Host executes 
+the payload, triggering the full kill chain:
+
+```powershell
+# Simulated phishing payload - Operation ShadowDrop
+# This script executes the same TTPs as a real APT attachment
+# but uses benign commands for lab safety
+
+.\test-events.ps1
