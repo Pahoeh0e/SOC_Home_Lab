@@ -77,9 +77,10 @@ upon script execution, detecting:
 connection) fire in sequence when the payload downloads from 
 `192.168.30.12:8080`.
 
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_TIme_3.png)
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_TIme_4.png)
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_TIme_5.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_3.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_4.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_5.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_6.png)
 
 
 Splunk correlates both alerts with Nginx access logs, confirming:
