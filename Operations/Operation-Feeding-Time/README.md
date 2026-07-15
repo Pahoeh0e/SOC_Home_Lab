@@ -85,8 +85,9 @@ Splunk correlates both alerts with Nginx access logs, confirming:
 - HTTP status code (200 = successful download)
 
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_3.png)
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_5.png)
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_6.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_5.png)
+
 
 ---
 
@@ -105,8 +106,8 @@ A host scoring **20+** is flagged **CRITICAL** in the Splunk dashboard.
 
 ### Kill Chain Timeline
 The Splunk timeline panel visualizes phase progression:
-- **10:00 PM:** Initial Access (PowerShell execution)
-- **10:01 PM:** Persistence (scheduled task)
+- **10:43 PM:** Initial Access (PowerShell execution)
+- **10:41 PM:** Persistence (scheduled task)
 - **10:02 PM:** Defense Evasion (firewall + log clear)
 - **10:03 PM:** Credential Access (CertUtil download)
 - **10:04 PM:** Exfiltration (BITSAdmin transfer)
