@@ -25,7 +25,7 @@ with VLAN-segmented networks (VLAN 10 internal, VLAN 30 DMZ).
 The attack begins with a spear-phishing email containing a malicious 
 PowerShell script disguised as an invoice:
 
-**Filename:** [`Invoice-2026-7843.ps1`](SOC_Home_Lab/Operations/Operation-Feeding-Time/Detections/Invoice-2026-7843.ps1)  
+**Filename:** [`Invoice-2026-7843.ps1`](Operations/Operation-Feeding-Time/Detection-rules/Invoice-2026-7843.ps1)  
 **Subject:** URGENT: Outstanding Invoice #INV-2026-7843  
 **Sender:** accounts@feeding_time-finance.com  
 
