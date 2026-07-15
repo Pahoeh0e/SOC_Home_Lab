@@ -34,8 +34,6 @@ the payload, triggering the full kill chain:
 
 -    This script executes the same TTPs as a real APT attachment but uses benign commands for lab safety
 
-
-
 ### Execution
 When double-clicked, the script executes a series of LOLBAS techniques 
 that mirror real-world APT behavior:
@@ -47,6 +45,8 @@ that mirror real-world APT behavior:
 | 3 | Firewall modification | Wazuh 100010 |
 | 4 | CertUtil download | Wazuh 100001 |
 | 5 | BITSAdmin exfiltration | Wazuh 100018 |
+
+(Operations/Screenshots/Windows_macro_1.png)
 
 ### Safety Controls
 - No actual malware or exploits
