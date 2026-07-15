@@ -32,13 +32,13 @@ PowerShell script disguised as an invoice:
 When the victim double-clicks the attachment, Windows Script Host executes 
 the payload, triggering the full kill chain:
 
-```powershell
+
 # Simulated phishing payload - Operation Feeding Time
 # This script executes the same TTPs as a real APT attachment
 # but uses benign commands for lab safety
 
 (.\Invoice-2026-7843.ps1)[SOC_Home_Lab/Operations/Operation-Feeding-Time/Detections/Invoice-2026-7843.ps1]
-```
+
 
 ### Execution
 When double-clicked, the script executes a series of LOLBAS techniques 
