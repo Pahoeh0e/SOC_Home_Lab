@@ -1,11 +1,9 @@
 # Network Architecture: Multi-VLAN Segmented Lab
 
-Internet
-  |
-  
-  Home Router (192.168.1.1/24)
-       
-        |
+                Internet
+                   |
+       Home Router (192.168.1.1/24)
+                   |
         +-- Proxmox Host (192.168.1.x)
         |
      vmbr0 (WAN) --+-- pfSense WAN (vtnet0, DHCP)
