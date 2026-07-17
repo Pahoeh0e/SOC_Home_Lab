@@ -47,6 +47,9 @@
 -   Kali Linux (LAN) → curl XSS payload → Snort alert: XSS attempt
 
 
+![Kali](Operations/Screenshots/Kali_attack_DMZ.png)
+
+
 ## Skills Demonstrated:
 
 -    Network segmentation (VLANs)	802.1q VLANs on Proxmox with pfSense routing
