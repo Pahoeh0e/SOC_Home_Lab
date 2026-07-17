@@ -182,20 +182,23 @@ HTTP status code (200 = successful download)
 
 ---
 
-### Host Risk Scoring
-Each alert contributes to a cumulative risk score:
-- Level 14 alerts (LSASS dump): 10 points
-- Level 13 alerts (PsExec pipes): 10 points
-- Level 12 alerts (event log clearing, credential tools): 7 points
-- Level 10 alerts (PowerShell, scheduled tasks, netsh, CertUtil): 5 points
+## Host Risk Scoring
+Each alert contributes to a cumulative risk score based on `rule.level`:
+- **Level 14** alerts: **10 points** (e.g., LSASS dump — 100400)
+- **Level 13** alerts: **10 points** (e.g., PsExec pipes — 100502)
+- **Level 12** alerts: **7 points** (e.g., event log clearing, credential tools — 100011, 100015)
+- **Level 10** alerts: **5 points** (e.g., PowerShell, scheduled tasks, netsh, CertUtil — 100005, 100010, 100014, 100016, 100105)
 
-A host scoring **20+** is flagged **CRITICAL** in the Splunk dashboard.
+In this lab run, the infected host (`WIN-52U4HN70935`) generated **32 alerts** with a cumulative risk score of **174**, flagged **CRITICAL** in the Splunk dashboard.
 
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp10lunk.png)
 
 ---
 
 ## Kill Chain Timeline
+The Splunk timeline panel visualizes alert volume per phase. In this lab, 
+the kill chain was executed multiple times across testing sessions, resulting 
+in phased detections spanning the monitoring window:
 
 
 | Phase                | Rule   | Time   |
@@ -210,5 +213,7 @@ A host scoring **20+** is flagged **CRITICAL** in the Splunk dashboard.
 | 5. Lateral Movement  | 100502 | T+105s |
 | 6. Command & Control | 100105 | T+120s |
 
-Total time from execution to C2: **~2 minutes**
+
+> **Note:** The script executes each phase with a 15-second delay, so a single 
+> run completes in approximately **2 minutes**. 
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp11lunk.png)
