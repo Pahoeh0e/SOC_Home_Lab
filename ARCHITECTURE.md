@@ -3,13 +3,12 @@
 Internet
   |
   
-Home Router (192.168.1.1/24)
-
+  Home Router (192.168.1.1/24)
+       
         |
-+-- Proxmox Host (192.168.1.x)
+        +-- Proxmox Host (192.168.1.x)
         |
-        
-+-- vmbr0 (WAN) --+-- pfSense WAN (vtnet0, DHCP)
+     vmbr0 (WAN) --+-- pfSense WAN (vtnet0, DHCP)
         |                          |
         |                  +-- pfSense LAN (vtnet1.10, 10.0.0.1/24)
         |                  |
