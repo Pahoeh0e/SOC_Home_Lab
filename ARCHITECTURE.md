@@ -48,6 +48,8 @@
 
 
 ![Kali](Operations/Screenshots/Kali_attack_DMZ.png)
+![DMZ](Operations/Screenshots/Snort_DMZ_attack_alert.png)
+
 
 
 ## Skills Demonstrated:
@@ -70,3 +72,5 @@
 -   Directory traversal
 -   Cross-site scripting (XSS)
 -   Real-time alert output to alert.fast
+
+
