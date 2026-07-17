@@ -46,9 +46,9 @@ that mirror real-world APT behavior:
 | 4 | CertUtil download | Wazuh 100001 |
 | 5 | BITSAdmin exfiltration | Wazuh 100018 |
 
-![Powershell](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Windows_macro_3.png)
-![Powershell](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Windows_macro_2.png)
-![Powershell](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Windows_macro_1.png)
+![Powershell](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp4lunk.png)
+![Powershell](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp5lunk.png)
+
 
 
 ### Safety Controls
@@ -84,9 +84,10 @@ Splunk correlates both alerts with Nginx access logs, confirming:
 - Source IP of the infected host
 - HTTP status code (200 = successful download)
 
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_3.png)
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_6.png)
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_5.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp6lunk.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp7lunk.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp8lunk.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp9lunk.png)
 
 
 ---
@@ -100,7 +101,7 @@ Each alert contributes to a cumulative risk score:
 
 A host scoring **20+** is flagged **CRITICAL** in the Splunk dashboard.
 
-![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Splunk_Feeding_Time_4.png)
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp10lunk.png)
 
 ---
 
@@ -113,3 +114,5 @@ The Splunk timeline panel visualizes phase progression:
 - **10:04 PM:** Exfiltration (BITSAdmin transfer)
 
 Total time from initial execution to exfiltration: **~4 minutes**
+
+![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp11lunk.png)
