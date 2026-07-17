@@ -116,8 +116,8 @@ Production-like SOC environment demonstrating:
 | **DET-006** | Credential Dumping (Mimikatz) | [T1003](https://attack.mitre.org/techniques/T1003/) | Sysmon + Wazuh | Critical |
 | **DET-007** | Persistence (Registry Run Keys) | [T1547.001](https://attack.mitre.org/techniques/T1547/001/) | Sysmon + Wazuh FIM | Medium |
 | **DET-008** | Data Exfiltration | [T1041](https://attack.mitre.org/techniques/T1041/) | Snort + pfSense | High |
-| **DET-009** | LOLBAS Tool Execution & Staging | [T1105](https://attack.mitre.org/techniques/T1105/), T1218 | Sysmon + Wazuh | High |
-| **DET-010** | LSASS Memory Dump (Event 10) | [T1003.001](https://attack.mitre.org/techniques/T1218/) | Sysmon + Wazuh | Critical |
+| **DET-009** | LOLBAS Tool Execution & Staging | [T1105](https://attack.mitre.org/techniques/T1105/), [T1218](https://attack.mitre.org/techniques/T1218/) | Sysmon + Wazuh | High |
+| **DET-010** | LSASS Memory Dump (Event 10) | [T1003.001](https://attack.mitre.org/techniques/T1003/) | Sysmon + Wazuh | Critical |
 | **DET-011** | PsExec Named Pipe Detection | [T1021.002](https://attack.mitre.org/techniques/T1021/002/) | Sysmon + Wazuh | High |
 | **DET-012** | Event Log Clearing | [T1070.001](https://attack.mitre.org/techniques/T1070/001/) | Sysmon + Wazuh | Medium |
 | **DET-013** | Firewall Modification (Netsh) | [T1562.004](https://attack.mitre.org/techniques/T1562/004/) | Sysmon + Wazuh | Medium |
