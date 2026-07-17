@@ -27,7 +27,35 @@
 
 -    Ubuntu Server 24.04 (minimised) web server
 -    Nginx serving a custom landing page
--    Static IP: 192.168.20.10/24
+
+## Initial setup:
+-   Ubuntu Server 24.04 (minimised) web server
+-   Finalised Snort configuration with working alert generation
+-   Verified detection of port scans, SQL injection, directory traversal, and XSS
+-   Enabled Snort as a system service for persistent monitoring
+
+## Validated Network Security Controls:
+-   Confirmed DMZ isolation: blocked from LAN (10.0.0.0/24) and MGMT (192.168.30.0/24)
+-   Verified LAN-to-DMZ access for legitimate web traffic
+-   Tested outbound internet access from DMZ for updates
+
+
+## Attack & Detection Workflow
+-   Kali Linux (LAN) → nmap port scan → Snort alert: port scan detected
+-   Kali Linux (LAN) → curl SQL injection → Snort alert: SQL injection attempt
+-   Kali Linux (LAN) → curl directory traversal → Snort alert: traversal attempt
+-   Kali Linux (LAN) → curl XSS payload → Snort alert: XSS attempt
+
+
+## Skills Demonstrated:
+
+-    Network segmentation (VLANs)	802.1q VLANs on Proxmox with pfSense routing
+-    Firewall policy design	Default-deny, explicit allow, inter-zone blocking
+-    NAT configuration	Outbound NAT for multiple internal networks
+-    Host-based intrusion detection	Snort on DMZ server with custom rules
+-    Threat simulation	Kali Linux reconnaissance and web attacks
+-    Troubleshooting	Systematic diagnosis of routing, DNS, and service issues
+-    Documentation	Network diagrams, alert logs
 
 
 ## Security Monitoring:
