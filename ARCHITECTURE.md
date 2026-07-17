@@ -1,11 +1,37 @@
 # Network Architecture: Multi-VLAN Segmented Lab
 
+Internet
+  |
+  
+Home Router (192.168.1.1/24)
 
-### Firewall VLAN interfaces on a single physical NIC (router-on-a-stick):
+        |
++-- Proxmox Host (192.168.1.x)
+        |
+        
++-- vmbr0 (WAN) --+-- pfSense WAN (vtnet0, DHCP)
+        |                          |
+        |                  +-- pfSense LAN (vtnet1.10, 10.0.0.1/24)
+        |                  |
+        |                  +-- pfSense DMZ (vtnet1.20, 192.168.20.1/24)
+        |                  |
+        |                  +-- pfSense MGMT (vtnet1.30, 192.168.30.1/24)
+        |                          |
+        +-- vmbr1 (VLAN-aware) <---+
+                |
+        +-- VLAN 10 (LAN) --+-- Kali Linux (10.0.0.100/24)
+        |                   +-- Windows Server (10.0.0.101/24) [Week 2]
+        |                   +-- Windows 10 (10.0.0.102/24) [Week 2]
+        |                   +-- Wazuh SIEM (10.0.0.50/24) [Week 3]
+        |
+        +-- VLAN 20 (DMZ) --+-- Ubuntu Web Server (192.168.20.10/24)
+        |                   |   +-- Nginx
+        |                   |   +-- Snort HIDS [Week 3]
+        |                   |
+        |                   +-- (future DMZ hosts)
+        |
+        +-- VLAN 30 (MGMT) --+-- (future management hosts)
 
--   vtnet1.10 — LAN (10.0.0.0/24)
--   vtnet1.20 — DMZ (192.168.20.0/24)
--   vtnet1.30 — MGMT (192.168.30.0/24)
 
 ### pfSense Firewall Configuration:
 
