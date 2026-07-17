@@ -4,6 +4,8 @@
 
   <!-- ================================================================
        ROW 1: Kill Chain Timeline
+       NOTE: Uses spath to explicitly extract rule.id from nested JSON,
+             then case() with string comparisons since rule.id is a string.
        ================================================================ -->
   <row>
     <panel>
@@ -103,9 +105,8 @@
       <title>MITRE ATT&amp;CK Coverage</title>
       <single>
         <search>
-          <query>index=wazuh sourcetype=wazuh rule.id IN ("100005","100006","100010","100011","100014","100015","100016","100105","100400","100502")
-| spath path=rule.mitre.id{} output=mitre_id
-| mvexpand mitre_id
+          <query>index=wazuh sourcetype=wazuh rule.id IN (100005,100006,100010,100011,100014,100015,100016,100105,100400,100502)
+| eval mitre_id=mvindex('rule.mitre.id{}', 0)
 | stats dc(mitre_id) as unique_techniques
 | eval label="Techniques Detected"</query>
           <earliest>-24h@h</earliest>
