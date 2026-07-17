@@ -92,39 +92,36 @@ Production-like SOC environment demonstrating:
 
 | Layer | Tool | Version | Purpose |
 |-------|------|---------|---------|
-| **Hypervisor** | Proxmox VE | 8.x | VM orchestration, VLANs, resource management |
-| **SIEM** | Splunk Enterprise | 9.x | Log aggregation, detection engineering, dashboards |
-| **EDR** | Wazuh | 4.7.x | Endpoint detection, FIM, vulnerability scanning |
-| **IDS** | Snort | 3.x | Network intrusion detection (DMZ sensor) |
-| **Firewall** | pfSense | 2.7.x | Perimeter security, VLAN routing, logging |
-| **Attacker** | Kali Linux | 2024.x | Red team simulation |
+| **Hypervisor** | Proxmox VE | 9.2 | VM orchestration, VLANs, resource management |
+| **SIEM** | Splunk Enterprise | 10.2 | Log aggregation, detection engineering, dashboards |
+| **EDR** | Wazuh | 4.14 | Endpoint detection, FIM, vulnerability scanning |
+| **IDS** | Snort | 3.1 | Network intrusion detection (DMZ sensor) |
+| **Firewall** | pfSense | 2.8 | Perimeter security, VLAN routing, logging |
+| **Attacker** | Kali Linux | 2026.2 | Red team simulation |
 | **Target** | Windows Server | 2022 | Domain services, attack target |
-| **Endpoint Telemetry** | Sysmon | 15.x | Windows process/network/file telemetry |
-| **Log Forwarder** | Splunk Universal Forwarder | 9.x | Endpoint log shipping |
+| **Endpoint Telemetry** | Sysmon | 15.21 | Windows process/network/file telemetry |
+| **Log Forwarder** | Splunk Universal Forwarder | 10.4 | Endpoint log shipping |
 
 ---
 
 ## Detection Capabilities
 
-| ID | Detection | MITRE Technique | Data Source | Severity |
+| ID | Detection | MITRE Technique | Data Source | Severity | 
 |----|-----------|----------------|-------------|----------|
-| **DET-001** | Port Scan Detection | T1046 | Snort / pfSense | Medium |
-| **DET-002** | Brute Force RDP / SSH | T1110 | Windows Event Logs + Wazuh | High |
-| **DET-003** | Malicious PowerShell Execution | T1059.001 | Sysmon + Splunk | Critical |
-| **DET-004** | Lateral Movement (PsExec / WMI) | T1021.002 | Sysmon + Wazuh | High |
-| **DET-005** | C2 Beaconing Detection | T1071 | Snort + Splunk | High |
-| **DET-006** | Credential Dumping (Mimikatz) | T1003 | Sysmon + Wazuh | Critical |
-| **DET-007** | Persistence (Registry Run Keys) | T1547.001 | Sysmon + Wazuh FIM | Medium |
-| **DET-008** | Data Exfiltration | T1041 | Snort + pfSense | High |
-
-### Detection Coverage by Kill Chain Phase
-
-Reconnaissance → Initial Access → Execution → Persistence → Privilege Escalation → Lateral Movement → C2 → Exfiltration
-↓              ↓               ↓            ↓                ↓                    ↓            ↓        ↓
-(DET-001)     (DET-002)      (DET-003)    (DET-007)        (DET-006)            (DET-004)    (DET-005) (DET-008)
-Port Scan     Brute Force    PowerShell   Registry         Mimikatz             PsExec       Beacon   Exfil
-
-
+| **DET-001** | Port Scan Detection | [T1046](https://attack.mitre.org/techniques/T1046/) | Snort / pfSense | Medium |
+| **DET-002** | Brute Force RDP / SSH | [T1110](https://attack.mitre.org/techniques/T1110/) | Windows Event Logs + Wazuh | High |
+| **DET-003** | Malicious PowerShell Execution | [T1059.001](https://attack.mitre.org/techniques/T1059/001/) | Sysmon + Splunk | Critical |
+| **DET-004** | Lateral Movement (PsExec / WMI) | [T1021.002](https://attack.mitre.org/techniques/T1021/002/) | Sysmon + Wazuh | High |
+| **DET-005** | C2 Beaconing Detection | [T1071](https://attack.mitre.org/techniques/T1071/) | Snort + Splunk | High |
+| **DET-006** | Credential Dumping (Mimikatz) | [T1003](https://attack.mitre.org/techniques/T1003/) | Sysmon + Wazuh | Critical |
+| **DET-007** | Persistence (Registry Run Keys) | [T1547.001](https://attack.mitre.org/techniques/T1547/001/) | Sysmon + Wazuh FIM | Medium |
+| **DET-008** | Data Exfiltration | [T1041](https://attack.mitre.org/techniques/T1041/) | Snort + pfSense | High |
+| **DET-009** | LOLBAS Tool Execution & Staging | [T1105](https://attack.mitre.org/techniques/T1105/), T1218 | Sysmon + Wazuh | High |
+| **DET-010** | LSASS Memory Dump (Event 10) | [T1003.001](https://attack.mitre.org/techniques/T1218/) | Sysmon + Wazuh | Critical |
+| **DET-011** | PsExec Named Pipe Detection | [T1021.002](https://attack.mitre.org/techniques/T1021/002/) | Sysmon + Wazuh | High |
+| **DET-012** | Event Log Clearing | [T1070.001](https://attack.mitre.org/techniques/T1070/001/) | Sysmon + Wazuh | Medium |
+| **DET-013** | Firewall Modification (Netsh) | [T1562.004](https://attack.mitre.org/techniques/T1562/004/) | Sysmon + Wazuh | Medium |
+| **DET-014** | Scheduled Task Creation | [T1053.005](https://attack.mitre.org/techniques/T1053/005/) | Sysmon + Wazuh | Medium |
 
 ---
 
@@ -132,15 +129,17 @@ Port Scan     Brute Force    PowerShell   Registry         Mimikatz             
 
 See [Operations](Operations) for full red team procedures with commands and screenshots.
 
-| Scenario | Tools | Target | Detections Triggered |
-|----------|-------|--------|---------------------|
-| **1. Network Reconnaissance** | Nmap | DMZ / Windows Server | DET-001 |
-| **2. RDP Brute Force** | Hydra | Windows Server | DET-002 |
-| **3. Reverse Shell (MSF)** | Metasploit | Windows Server | DET-003, DET-005 |
-| **4. Credential Dumping** | Mimikatz | Windows Server | DET-006 |
-| **5. Lateral Movement** | PsExec | DMZ VM | DET-004 |
-| **6. Data Exfiltration** | Netcat / DNS | External via DMZ | DET-008 |
-
+| Step | Action | Detection |
+|------|--------|-----------|
+| 1 | PowerShell IEX download from staging server | Wazuh 100005 |
+| 2 | Scheduled task creation | Wazuh 100014 |
+| 3 | Netsh firewall modification | Wazuh 100010 |
+| 4 | Event log clearing | Wazuh 100011 |
+| 5 | LSASS memory dump via comsvcs.dll | Wazuh 100400 |
+| 6 | Credential dumping tool execution (ProcDump) | Wazuh 100015 |
+| 7 | PsExec execution | Wazuh 100016 |
+| 8 | PsExec pipe detection | Wazuh 100502 |
+| 9 | CertUtil download from staging server | Wazuh 100105 |
 ---
 
 ## Documentation
