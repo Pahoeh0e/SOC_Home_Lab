@@ -172,7 +172,7 @@ HTTP status code (200 = successful download)
 **Event:** Sysmon 3
 **MITRE:** T1105, T1218
 
-
+## Splunk Dashboards
 
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp6lunk.png)
 ![Splunk](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/GitHub_Sp7lunk.png)
