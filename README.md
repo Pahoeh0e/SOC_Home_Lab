@@ -149,8 +149,7 @@ See [ATTACK-SCENARIOS.md](ATTACK-SCENARIOS.md) for full red team procedures with
 |------|-------------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Proxmox topology, VLAN config, pfSense rules, VM specs |
 | [DETECTION-RULES.md](DETECTION-RULES.md) | SPL queries, Wazuh rules, Snort rules, MITRE mappings |
-| [DASHBOARDS.md](DASHBOARDS.md) | Splunk dashboard specifications and panel queries |
-| [ATTACK-SCENARIOS.md](ATTACK-SCENARIOS.md) | Step-by-step attack procedures with expected detections |
+| [Operations.md](Operations) | Step-by-step attack procedures with expected detections |
 
 ---
 
