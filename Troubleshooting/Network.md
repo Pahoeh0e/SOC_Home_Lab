@@ -13,8 +13,8 @@ Each guide follows the same structure:
 
 
 Index:
-- [pfSense Web UI access](19) 
-- [Proxmox pool storage](200)
+- [pfSense Web UI access](# pfSense WAN Gets `192.168.122.x` — Cannot Access Web UI from Laptop) 
+- [Proxmox pool storage](# Proxmox Thin Pool 100% Full — Cannot Create VMs / ZFS Corruption)
 
 
 # pfSense WAN Gets `192.168.122.x` — Cannot Access Web UI from Laptop
