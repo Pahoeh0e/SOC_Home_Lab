@@ -1,6 +1,6 @@
 # Network Troubleshooting 
 
-See [Network Architecture](Architecture.md) for the full architecture 
+See [Network Architecture](ARCHITECTURE.md) for the full architecture 
 
 # Format
 
@@ -13,11 +13,11 @@ Each guide follows the same structure:
 
 
 Index:
-- [pfSense Web UI access](# pfSense WAN Gets `192.168.122.x` — Cannot Access Web UI from Laptop) 
-- [Proxmox pool storage](# Proxmox Thin Pool 100% Full — Cannot Create VMs / ZFS Corruption)
+- [pfSense Web UI access](#Accessing-pfSense-Web-UI) 
+- [Proxmox pool storage](#Proxmox-Storage)
 
 
-# pfSense WAN Gets `192.168.122.x` — Cannot Access Web UI from Laptop
+# Accessing pfSense Web UI
 
 ## Symptoms
 
@@ -197,7 +197,7 @@ If you are on **WiFi only** and MacVTap does not work with your wireless card, c
 
 
 
-# Proxmox Thin Pool 100% Full — Cannot Create VMs / ZFS Corruption
+# Proxmox Storage
 
 ## Symptoms
 
