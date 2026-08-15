@@ -210,8 +210,6 @@ If you are on **WiFi only** and MacVTap does not work with your wireless card, c
 
 ![vgs](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-06-14%2013-50-37.png)
 ![snapshot](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-07-02%2018-28-37.png)
-![command](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-07-03%2001-46-14.png)
-![command2](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-07-06%2016-41-56.png)
 
 ## Root Cause
 
