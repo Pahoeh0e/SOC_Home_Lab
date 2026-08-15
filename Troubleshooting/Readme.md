@@ -18,7 +18,7 @@ These notes are for:
 - **Attacker:** Kali Linux
 
 ## Categories
-- [Network Troubleshooting](Troubleshooting/Network.md)
+- [Network Troubleshooting](/Troubleshooting/Network.md)
 - [Configuration Mistakes](/Troubleshooting/Configuration-Mistakes.md)
 
 ## Disclaimer
