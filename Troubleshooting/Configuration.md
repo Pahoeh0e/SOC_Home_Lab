@@ -149,14 +149,6 @@ Both should succeed.
 | Production/high-performance Windows | Install with E1000, add VirtIO drivers, then switch |
 | Quick lab setup | Use **E1000 + IDE** everywhere — one less variable |
 
-### Proxmox VM Creation Checklist
-
-When creating a Windows VM in Proxmox, set:
-
-- [ ] **System → Machine:** `i440fx` or `q35`
-- [ ] **Disks → Bus/Device:** `IDE` or `SATA` (for install) / `VirtIO Block` (if loading drivers)
-- [ ] **Network → Model:** `Intel E1000` (for install) / `VirtIO` (after driver install)
-- [ ] **Network → Firewall:** ❌ Unchecked (pfSense handles security)
 
 
 # Wazuh Agent Unreachable
@@ -461,7 +453,7 @@ sudo systemctl start wazuh-dashboard
 | Web UI ready | `curl -k https://192.168.30.12` | Returns HTML (login page) |
 | Custom rules firing | `sudo grep "100001" /var/ossec/logs/alerts/alerts.log` | Alert entries found |
 
-## Prevention
+## Lessons Learnt
 
 | Practice | Why |
 |----------|-----|
@@ -470,25 +462,6 @@ sudo systemctl start wazuh-dashboard
 | **Never manually edit `client.keys`** | Use `manage_agents` to avoid corruption |
 | **Check `wazuh-control status` after any manager reboot** | Catches authd/indexer failures early |
 | **Monitor `agent_control -l` after agent reboots** | Detects "Never connected" before testing |
-
-### Post-Reboot Checklist
-
-After any Proxmox host or Wazuh VM reboot:
-
-- [ ] `sudo /var/ossec/bin/wazuh-control status` — all services running
-- [ ] `sudo ss -tlnp | grep 1514` — remoted listening
-- [ ] `sudo ss -tlnp | grep 1515` — authd listening (only needed for new registrations)
-- [ ] `sudo /var/ossec/bin/agent_control -l` — all agents `Active`
-- [ ] `sudo systemctl status wazuh-indexer` — indexer running
-- [ ] `sudo systemctl status wazuh-dashboard` — dashboard running
-- [ ] Wazuh web UI loads without "server is not ready" error
-
-## Related Issues
-
-- [ ] [Splunk SSH Tunnel Broken After Reboot](network-ssh-tunnel-splunk-web-ui-access.md) — similar service-not-started issue on a different VM
-- [ ] [Proxmox Thin Pool Full](storage-proxmox-thin-pool-full.md) — disk pressure can cause Wazuh indexer to crash or fail to start
-- [ ] [Windows Defender Blocking Payloads](lab-windows-defender-blocking-payloads.md) — if Sysmon/Wazuh agent processes are quarantined, agent stops sending events
-
 
 
 
@@ -702,7 +675,7 @@ sudo /opt/splunk/bin/splunk restart
 | Tunnel active | `ss -tlnp \| grep 8080` (on Kali) | `127.0.0.1:8080` |
 | Web UI loads | `curl http://localhost:8080` (on Kali) | HTML response |
 
-## Lessons Learnt
+## 
 
 ### Make Splunk Auto-Start
 
