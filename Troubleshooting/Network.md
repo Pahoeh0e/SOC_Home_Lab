@@ -5,12 +5,12 @@ See [Network Architecture](ARCHITECTURE.md) for the full architecture
 ## Format
 
 Each guide follows the same structure:
-- **Symptoms** — what you see when the issue occurs
-- **Root Cause** — why it happens
-- **Diagnosis** — commands and checks to confirm
-- **Fix** — step-by-step resolution
+- **What went wrong** — Symptomshat you see when the issue occurs
+- **The Problem** — why it happens
+- **How I Figured It Out** — commands and checks to confirm
+- **Fix/Fixes** — step-by-step resolution
+- **How to Check It's Working** - Confirming the fix works
 - **lessons learnt** — how to avoid it next time
-
 
 ## Index:
 - [pfSense Web UI access](#Accessing-pfSense-Web-UI) 
