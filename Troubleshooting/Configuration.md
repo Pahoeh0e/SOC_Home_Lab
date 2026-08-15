@@ -1,6 +1,6 @@
 # Configuration Troubleshooting
 
-# Format
+## Format
 
 Each guide follows the same structure:
 - **Symptoms** — what you see when the issue occurs
@@ -11,8 +11,9 @@ Each guide follows the same structure:
 - **lessons learnt** — how to avoid it next time
 
 
-Index:
-- [VM Network bridge](#VM-Network-Bridge-not-working) 
+## Index:
+- [VM Network bridge](#VM-Network-Bridge-not-working)
+- [Splunk Web UI not Accessbible](#Splunk-Web-UI-Not-Accessible)
 
 
 
@@ -174,7 +175,7 @@ When creating a Windows VM in Proxmox, set:
 - [ ] **Network → Firewall:** ❌ Unchecked (pfSense handles security)
 
 
-# SSH Tunnel Breaks After Proxmox Reboot — Cannot Access Splunk Web UI
+# Splunk Web UI Not Accessible
 
 ## Symptoms
 
