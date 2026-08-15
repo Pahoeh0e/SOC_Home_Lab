@@ -15,6 +15,7 @@ Each guide follows the same structure:
 - [VM Network Bridge](#VM-Network-Bridge-not-working)
 - [Wazuh Agent Unreachable](#Wazuh-Agent-Unreachable)
 - [Splunk Web UI not Accessbible](#Splunk-Web-UI-Not-Accessible)
+- [Wazuh Dashboard Field Errors](#Wazuh-Dashboard-Field-Errors)
 
 
 
@@ -729,4 +730,272 @@ Then access from my PC directly:
 ```
 http://<pfSense-LAN-IP>:8000
 ```
+
+
+# Wazuh Dashboard Field Errors
+
+## Symptoms
+
+- Splunk dashboard panel shows error: `The '>=' operator received different types.`
+- `rule.level` comparisons fail — the field is a string, not a number
+- MITRE technique panel shows `0` or blank — `rule.mitre.id` doesn't exist, but `rule.mitre.id{}` does
+- `endpoint_ip` column is blank in tables — `win.eventdata.sourceIp` field is missing or named differently
+- Dashboard only shows some custom rule IDs — the `rule.id IN (...)` filter is incomplete
+- GitHub README shows broken image links — `!{}(path)` instead of `![](path)`
+- Dashboard XML fails to import or panels show no data after successful import
+
+## Root Cause
+
+Wazuh alert fields in Splunk are **not always in the format you expect**. Field names, data types, and multivalue handling differ between Wazuh versions and Splunk sourcetypes:
+
+| What You Expected | What Wazuh Actually Sends | Why It Breaks |
+|-------------------|--------------------------|---------------|
+| `rule.level` as integer | `rule.level` as **string** | `>=` comparison fails |
+| `rule.mitre.id` as single value | `rule.mitre.id{}` as **multivalue** | `stats dc()` returns 0 |
+| `win.eventdata.sourceIp` | `data.srcip` or `agent.ip` | Table column is blank |
+| `rule.id` as number | `rule.id` as **string** | `IN (100001,100002)` may not match |
+| Standard Markdown `![](path)` | `!{}(path)` typo | GitHub renders broken image |
+
+```
+Wazuh alerts.json ──► Splunk ingestion ──► Field extraction
+      │                                          │
+      │    rule.level: "10" (string)             ▼
+      │    rule.mitre.id{}: ["T1105"]      Dashboard SPL fails
+      │    data.srcip: "10.0.0.101"        because field names
+      │                                     and types differ
+```
+
+## Diagnosis
+
+### Step 1: Check Field Data Types
+
+```spl
+index=wazuh sourcetype=wazuh rule.id=100001
+| eval level_type=typeof(rule.level)
+| eval id_type=typeof(rule.id)
+| table rule.id, rule.level, level_type, id_type
+```
+
+**Problem:**
+```
+rule.id    rule.level    level_type    id_type
+100001     10            String        String
+```
+
+**Expected:**
+```
+rule.id    rule.level    level_type    id_type
+100001     10            Number        String
+```
+
+### Step 2: Check MITRE Field Names
+
+```spl
+index=wazuh sourcetype=wazuh rule.id=100001
+| fieldsummary
+| search field="*mitre*"
+```
+
+**Problem:**
+```
+field                  count    distinct_count
+rule.mitre.id{}        0        0
+rule.mitre.tactic{}    0        0
+```
+
+Or the field exists but is multivalue:
+```
+field                  count    distinct_count
+rule.mitre.id{}        1        1
+```
+
+### Step 3: Check IP Address Fields
+
+```spl
+index=wazuh sourcetype=wazuh rule.id=100001
+| fieldsummary
+| search field="*ip*"
+```
+
+Common Wazuh IP fields:
+```
+agent.ip
+data.srcip
+data.win.system.ip
+win.eventdata.sourceIp
+```
+
+### Step 4: Check Which Rule IDs Actually Have Alerts
+
+```spl
+index=wazuh sourcetype=wazuh
+| stats count by rule.id
+| sort -count
+```
+
+Compare this list against your dashboard's `rule.id IN (...)` filter. Missing IDs = missing alerts.
+
+### Step 5: Check Raw Event Structure
+
+```spl
+index=wazuh sourcetype=wazuh rule.id=100001
+| head 1
+```
+
+Expand the event and look at the **Interesting Fields** panel. This shows exactly what Splunk extracted.
+
+## Fix
+
+### Fix 1: Convert `rule.level` to Integer
+
+**Broken:**
+```spl
+| eval severity=case(rule.level>=12, "Critical", rule.level>=8, "High", 1=1, "Low")
+```
+
+**Fixed:**
+```spl
+| eval severity=case(tonumber(rule.level)>=12, "Critical", tonumber(rule.level)>=8, "High", 1=1, "Low")
+```
+
+Or convert once at the start:
+```spl
+index=wazuh sourcetype=wazuh
+| eval rule_level_num=tonumber(rule.level)
+| eval severity=case(rule_level_num>=12, "Critical", rule_level_num>=8, "High", 1=1, "Low")
+```
+
+### Fix 2: Handle Multivalue MITRE Fields
+
+**Broken:**
+```spl
+| stats dc(rule.mitre.id) as unique_techniques
+```
+
+**Fixed — extract first value:**
+```spl
+| eval mitre_id=mvindex('rule.mitre.id{}', 0)
+| stats dc(mitre_id) as unique_techniques
+```
+
+**Fixed — count all values:**
+```spl
+| eval mitre_id=mvindex('rule.mitre.id{}', 0)
+| stats dc(mitre_id) as unique_techniques, values('rule.mitre.id{}') as all_techniques
+```
+
+**Fixed — in XML dashboards (escape curly braces):**
+```xml
+<search>
+  <query>
+    index=wazuh sourcetype=wazuh
+    | eval mitre_id=mvindex('rule.mitre.id{}', 0)
+    | stats dc(mitre_id) as unique_techniques
+  </query>
+</search>
+```
+
+> **Note:** In Splunk dashboard XML, always wrap curly-brace field names in **single quotes** to prevent the XML parser from interpreting `{}` as a token.
+
+### Fix 3: Find the Correct IP Field
+
+Test each candidate:
+
+```spl
+index=wazuh sourcetype=wazuh rule.id=100001
+| eval candidate_1=agent.ip
+| eval candidate_2=data.srcip
+| eval candidate_3=win.eventdata.sourceIp
+| eval candidate_4=data.win.system.ip
+| table candidate_1, candidate_2, candidate_3, candidate_4
+```
+
+Use whichever returns a value. For Sysmon-based rules, it's often `agent.ip` or `data.srcip`.
+
+**Fixed table:**
+```spl
+index=wazuh sourcetype=wazuh rule.id IN (100001,100005,100105)
+| eval endpoint_ip=coalesce(agent.ip, data.srcip, "unknown")
+| table _time, rule.id, rule.description, endpoint_ip
+```
+
+### Fix 4: Include All Rule IDs in Dashboard Filters
+
+Compare your XML filter against your actual rules:
+
+**Your rules file might have:**
+```xml
+<rule id="100001"> ... </rule>
+<rule id="100005"> ... </rule>
+<rule id="100400"> ... </rule>
+<rule id="100502"> ... </rule>
+```
+
+**Your dashboard might only include:**
+```spl
+rule.id IN (100001,100005,100006,100010,100011,100014,100015,100016,100105)
+```
+
+**Fix:** Add missing IDs:
+```spl
+rule.id IN (100001,100005,100006,100010,100011,100014,100015,100016,100105,100400,100502,...)
+```
+
+Or use a wildcard (if your IDs share a prefix):
+```spl
+rule.id=100*
+```
+
+### Fix 5: Fix GitHub Image Markdown
+
+**Broken:**
+```markdown
+!{}(screenshots/wazuh-alerts.png)
+```
+
+**Fixed:**
+```markdown
+![Wazuh Alerts](screenshots/wazuh-alerts.png)
+```
+
+Syntax: `![Alt text](relative/path/from/readme.png)`
+
+## Verification
+
+After fixing each panel, run the standalone search in **Splunk Search & Reporting** before updating the dashboard XML:
+
+| Panel | Test Search |
+|-------|-------------|
+| Host Risk Score | `index=wazuh sourcetype=wazuh \| eval severity=case(tonumber(rule.level)>=12,10,...) \| stats sum(severity) by agent.name` |
+| MITRE Coverage | `index=wazuh sourcetype=wazuh \| eval mitre_id=mvindex('rule.mitre.id{}',0) \| stats dc(mitre_id)` |
+| Endpoint IP | `index=wazuh sourcetype=wazuh \| eval ip=coalesce(agent.ip,data.srcip) \| table ip` |
+| All Rules | `index=wazuh sourcetype=wazuh \| stats count by rule.id \| sort rule.id` |
+
+## Lessons Learnt
+
+| Practice | Why |
+|----------|-----|
+| **Always use `typeof()` before comparing fields** | Catches string/number mismatches early |
+| **Use `fieldsummary` after ingesting new data** | Shows exact field names and types |
+| **Quote curly-brace fields in XML** | `'rule.mitre.id{}'` not `rule.mitre.id{}` |
+| **Use `coalesce()` for optional fields** | `coalesce(agent.ip, data.srcip, "unknown")` handles missing data gracefully |
+| **Test SPL in Search before pasting into XML** | Dashboard XML is harder to debug |
+| **Keep a field reference sheet** | Document your Wazuh version's field names |
+
+### Wazuh-to-Splunk Field Reference (Common Mappings)
+
+| Concept | Wazuh Field | Splunk Type | Notes |
+|---------|-------------|-------------|-------|
+| Rule ID | `rule.id` | String | Use `tonumber()` for math |
+| Rule Level | `rule.level` | String | Use `tonumber()` for comparisons |
+| MITRE ID | `rule.mitre.id{}` | Multivalue | Use `mvindex()` to extract |
+| MITRE Tactic | `rule.mitre.tactic{}` | Multivalue | Use `mvindex()` to extract |
+| Agent Name | `agent.name` | String | Reliable |
+| Agent IP | `agent.ip` | String | May be missing; fallback to `data.srcip` |
+| Source IP | `data.srcip` | String | Network-based rules |
+| Process Image | `win.eventdata.image` | String | Sysmon Event ID 1 |
+| Command Line | `win.eventdata.commandLine` | String | Sysmon Event ID 1 |
+| Parent Image | `win.eventdata.parentImage` | String | Sysmon Event ID 1 |
+| Target Image | `win.eventdata.targetImage` | String | Sysmon Event ID 10 |
+| Timestamp | `_time` | Time | Splunk-native, always present |
 
