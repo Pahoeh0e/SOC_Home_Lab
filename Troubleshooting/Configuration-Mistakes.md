@@ -1,13 +1,21 @@
 # Configuration Troubleshooting
 
+# Format
+
+Each guide follows the same structure:
+- **Symptoms** — what you see when the issue occurs
+- **Root Cause** — why it happens
+- **Diagnosis** — commands and checks to confirm
+- **Fix** — step-by-step resolution
+- **lessons learnt** — how to avoid it next time
+
+
+Index:
+- [VM Network bridge](#VM-Network-Bridge-not-working) 
 
 
 
-
-
-
-
-# VM Network Adapter: E1000 vs VirtIO — Windows Doesn't See Network Card
+# VM Network Bridge not working
 
 ## Symptoms
 
