@@ -19,392 +19,263 @@ Each guide follows the same structure:
 
 # Accessing pfSense Web UI
 
-## Symptoms
+**Category:** Network / VM Setup  
+**Lab Context:** Setting up pfSense firewall inside Proxmox  
+**Applies To:** Proxmox running as a VM inside QEMU/KVM
 
-- pfSense console shows WAN IP as `192.168.122.x/24` instead of your home network (e.g., `192.168.1.x/24`)
-- Proxmox host also has IP `192.168.122.x` on `vmbr0`
-- My PC (on `192.168.1.x`) cannot ping or browse to the pfSense web UI
-- pfSense installation may fail at package fetch (68/182) because it cannot reach the internet
-- From Proxmox, `ping 8.8.8.8` fails
+---
 
-## Root Cause
+## What Went Wrong
 
-Your Proxmox VM (running nested inside QEMU/KVM on your Linux host) is attached to **libvirt's default NAT network** (`virbr0`, `192.168.122.0/24`) instead of being bridged to your physical network interface. This creates a double-NAT situation:
+I installed pfSense and expected to open a browser on my laptop and go to the web UI. Instead I got "Unable to connect." I checked the pfSense console and saw the WAN IP was `192.168.122.something` — but my laptop is on `192.168.1.something`. They were on completely different networks. My laptop had no way to reach pfSense.
 
-```
-Laptop (192.168.1.x)  --X-->  Proxmox (192.168.122.x)  -->  pfSense WAN (192.168.122.x)
-       Home LAN                    Libvirt NAT                     No internet
-```
+I also couldn't install packages during the pfSense setup because it had no internet access.
 
-pfSense gets its WAN IP from libvirt's internal DHCP server, not from your home router. My PC is on a completely different subnet with no route to `192.168.122.0/24`.
+---
 
-## Diagnosis
+## The Problem
 
-### On Proxmox
+When I created the Proxmox VM in virt-manager, I left the network on the default setting: **NAT**. This puts Proxmox (and therefore pfSense) on an isolated network (`192.168.122.x`) that my home router knows nothing about. My laptop is on my home LAN (`192.168.1.x`) and has no route to that other network.
 
+Think of it like this: pfSense was sitting in a room with a locked door, and my laptop was in a different building.
+
+---
+
+## How I Figured It Out
+
+**On Proxmox:**
 ```bash
 ip addr show vmbr0
 ```
 
-**Bad output:**
+It showed:
 ```
-inet 192.168.122.42/24 brd 192.168.122.255
-```
-
-**Good output:**
-```
-inet 192.168.1.x/24 brd 192.168.1.255
+inet 192.168.122.42/24
 ```
 
-### On pfSense Console
+That `122` subnet is the giveaway. It means NAT mode. It should have been `192.168.1.something` — the same subnet as my laptop.
 
+**On the pfSense console:**
 ```
 WAN (vtnet0) -> v4/DHCP4: 192.168.122.x/24
 ```
 
-**Should be:** `192.168.1.x/24` (or whatever your home router subnet is)
+That confirmed it. pfSense got its IP from the virtual NAT network, not from my home router.
 
-### On my PC
+---
 
-**Windows:**
-```cmd
-ipconfig
-```
+## The Fix
 
-**Linux/Mac:**
-```bash
-ip addr show
-```
+I needed to change the Proxmox VM's network from NAT to **MacVTap** (also called bridged mode). This lets Proxmox connect directly to my physical network and get an IP from my home router, just like my laptop does.
 
-Confirmed my PC is on a different subnet (e.g., `192.168.1.x`) than Proxmox/pfSense.
-
-## Fix
-
-### Option 1: Change QEMU/virt-manager Network to MacVTap (Recommended)
-
-This gives Proxmox a direct layer-2 connection to your physical network, so it gets an IP from your home router just like any other device.
-
-1. **Shut down the Proxmox VM** from virt-manager
-2. Open **virt-manager** → right-click your Proxmox VM → **Open**
-3. Click the **lightbulb icon** (Show virtual hardware details)
-4. Click **NIC** (network interface)
-5. Change **Network source** from `Virtual network 'default': NAT` to **MacVTap device...**
-6. Select your physical interface:
-   - Wired: `eno1`, `ens33`, `eth0`, `enp3s0`, etc.
-   - **Note:** WiFi interfaces (`wlp5s0`, etc.) often do not work with MacVTap due to wireless limitations
+1. **Shut down the Proxmox VM** in virt-manager
+2. Right-click the VM → **Open**
+3. Click the **lightbulb icon** (hardware details)
+4. Click **NIC**
+5. Change **Network source** from `Virtual network 'default': NAT` to **`MacVTap device...`**
+6. Pick your wired network interface (e.g., `eno1`, `eth0`)
 7. Click **Apply**
-8. Start Proxmox VM
-9. Verify: `ip addr show vmbr0` should now show `192.168.1.x`
+8. Start the VM
 
-### Option 2: Create a Linux Bridge on Your Host
-
-If MacVTap is unavailable or you need multiple VMs on the same network:
-
+After it boots, check the IP:
 ```bash
-# Find your physical interface
-ip link show
-
-# Create bridge (replace eno1 with your interface)
-sudo ip link add name br0 type bridge
-sudo ip link set br0 up
-sudo ip link set eno1 master br0
-
-# In virt-manager, set NIC Network source to: Bridge 'br0'
+ip addr show vmbr0
 ```
 
-**Note:** You may lose host network connectivity until you assign an IP to `br0` instead of the physical interface.
+Now it should show `192.168.1.x` — matching your home network.
 
-### Option 3: Access pfSense From the Linux Host (Quick Workaround)
+**Note:** MacVTap doesn't always work with WiFi. If you're on WiFi and this fails, try plugging in an Ethernet cable or use the workaround below.
 
-Since your Linux host IS on `192.168.122.0/24` (libvirt adds it to that network), you can access pfSense directly from the host without changing any network settings.
+---
 
+## The Quick Workaround (If You Can't Change the Network)
+
+If MacVTap isn't an option, you can access pfSense from the Linux host itself — because the host IS on that `192.168.122.x` network.
+
+On your Linux host:
 ```bash
-# On your Linux host, open a browser
 firefox https://192.168.122.x/
-# Replace 192.168.122.x with pfSense's actual WAN IP
 ```
 
-Or use an SSH tunnel to forward pfSense to my PC:
+Replace `192.168.122.x` with whatever IP the pfSense console shows.
 
+Or forward the port through an SSH tunnel:
 ```bash
-# On Linux host
 ssh -L 8443:192.168.122.x:8443 user@your-laptop-ip
 ```
 
-Then on laptop: `https://localhost:8443/`
-
-### Option 4: Port Forward from Host to pfSense
-
-Forward host port 8443 to pfSense's web UI:
-
-```bash
-# Replace 192.168.122.x with pfSense's actual WAN IP
-sudo iptables -t nat -A PREROUTING -p tcp --dport 8443 -j DNAT --to-destination 192.168.122.x:8443
-sudo iptables -t nat -A POSTROUTING -j MASQUERADE
+Then on your laptop browse to:
+```
+https://localhost:8443/
 ```
 
-Access from laptop:
-```
-https://<LINUX-HOST-IP>:8443/
-```
+---
 
-## Verification
+## How to Check It's Working
 
-After applying Option 1 or 2:
+1. **Proxmox IP:** `ip addr show vmbr0` should show `192.168.1.x/24`
+2. **pfSense WAN:** Console should show `192.168.1.x/24`
+3. **From laptop:** `ping <pfSense-IP>` should reply
+4. **Browser:** `https://<pfSense-IP>:8443/` should show the login page
 
-1. On Proxmox:
-   ```bash
-   ip addr show vmbr0
-   ```
-   Should show `192.168.1.x/24` (home network)
+---
 
-2. On pfSense console:
-   ```
-   WAN (vtnet0) -> v4/DHCP4: 192.168.1.x/24
-   ```
+## Lessons Learned
 
-3. From my PC:
-   ```bash
-   ping <pfSense-WAN-IP>
-   ```
-   Should reply successfully.
-
-4. Browse to:
-   ```
-   https://<pfSense-WAN-IP>:8443/
-   ```
-   Should load the pfSense login page.
-
-## Lessons Learnt
-
-When creating the Proxmox VM in virt-manager for the first time, always set the network to bridge/MacVTap mode instead of the default NAT:
-
-| Setting | Wrong | Right |
-|---------|-------|-------|
-| Network source | `Virtual network 'default': NAT` | `MacVTap device 'eno1'` or `Bridge 'br0'` |
-| Result | `192.168.122.x` — isolated | `192.168.1.x` — on home LAN |
-
-If you are on **WiFi only** and MacVTap does not work with your wireless card, consider:
-- Using a USB-to-Ethernet adapter for the Linux host
-- Creating a routed network in libvirt instead of NAT
-- Using Option 3/4 as a permanent workaround
+- **NAT is the default in virt-manager, but it's wrong for this use case.** NAT isolates your VM. For a firewall that needs to be reachable from your LAN, you need bridged/MacVTap mode.
+- **Check the IP before you troubleshoot anything else.** If the first three octets don't match your home network, that's the problem.
+- **WiFi and MacVTap don't always get along.** If you're on WiFi, keep an Ethernet adapter handy for lab work.
+- **The workaround works in a pinch.** SSH tunnels aren't pretty, but they'll get you into the web UI while you figure out the proper fix.
 
 
 
 # Proxmox Storage
 
-## Symptoms
+**Category:** Storage / Proxmox  
+**Lab Context:** Running multiple VMs, suddenly can't create new ones  
+**Applies To:** Proxmox running as a VM inside QEMU/KVM
 
-- Cannot create new VMs: "no space left on device"
-- `vgs` shows `VG pve` with very little or no free space (e.g., `8.88G` free on `71.50G` total)
-- `lvs` shows thin pool `data` at 100% full
-- Warning: "Sum of all thin volume sizes (80.00 GiB) exceeds size of thin pool"
-- Existing VMs crash or fail to write: pfSense shows `ZFS error 5`, `mounting from zfs:pfsense/root/default failed`
-- `qemu-img info` on the Proxmox VM disk file shows `virtual size: 272 GiB` but `disk size: 53 GiB` — the virtual disk is large but the filesystem inside hasn't been expanded
+---
 
-![vgs](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-06-14%2013-50-37.png)
-![snapshot](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-07-02%2018-28-37.png)
+## What Went Wrong
 
-## Root Cause
+I tried to create a new VM and Proxmox said "no space left on device." I checked and the thin pool was at 100%. But I had given the Proxmox VM a 272 GB virtual disk — so where did all the space go?
 
-Your Proxmox VM (nested inside QEMU) was created with a virtual disk that is larger than what Proxmox's LVM thin pool was configured to use during installation. The underlying QEMU disk file has plenty of virtual space, but Proxmox only allocated ~72 GB to its LVM physical volume (`/dev/vda3`), leaving the rest of the virtual disk unclaimed.
+It turned out Proxmox could only see about 72 GB of that disk. The rest was just sitting there unused. On top of that, I had promised more disk space to my VMs than Proxmox actually had available (thin provisioning), so when they all started writing data, the pool filled up and things started breaking. My pfSense VM even got corrupted and wouldn't boot.
 
-Additionally, thin provisioning allowed you to over-allocate VM disk space (promising 80 GB+ to VMs on ~72 GB of real backing space). When VMs actually wrote enough data to fill the pool, writes failed — causing filesystem corruption in ZFS-based VMs like pfSense.
 
-```
-QEMU virtual disk file: 272 GB
-    |
-    +-- /dev/vda3 partition: 71.5 GB (what Proxmox sees)
-            |
-            +-- VG pve: 71.5 GB
-                    |
-                    +-- Thin pool data: ~24 GB (over-provisioned)
-                            |
-                            +-- VM disks: 80 GB promised -> pool runs out
-```
 
-## Diagnosis
+---
 
-### On Proxmox
+## The Problem
 
+Two things were happening at once:
+
+1. **Proxmox only saw part of the disk.** The virtual disk file was 272 GB, but the partition inside Proxmox was only ~72 GB. The rest was unallocated.
+
+2. **Thin provisioning let me over-promise.** I told my VMs they could have 80 GB total, but Proxmox only had ~72 GB. When the VMs actually used that much space, the pool ran dry.
+
+---
+
+## How I Figured It Out
+
+**On Proxmox:**
 ```bash
 vgs
 ```
 
-**Bad output:**
+Showed:
 ```
   VG  #PV #LV #SN Attr   VSize   VFree
   pve   1   4   0 wz--n-  71.50g 8.88g
 ```
 
-**Good output:**
-```
-  VG  #PV #LV #SN Attr   VSize    VFree
-  pve   1   4   0 wz--n- 271.50g 220.00g
-```
+Only 71 GB total — but my virtual disk was 272 GB.
 
+**Then:**
 ```bash
 lvs
 ```
 
-**Bad output:**
+Showed:
 ```
   LV    VG  Attr       LSize   Pool Origin Data%  Meta%
   data  pve twi-aotz--  24.75g             100.00  43.12
 ```
+![vgs](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-06-14%2013-50-37.png)
+![snapshot](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-07-02%2018-28-37.png)
 
-```bash
-pvesm status
-```
+The thin pool was at 100%. That's why nothing could write.
 
-Shows `local-lvm` at or near 100% usage.
-
-### On QEMU Host (Linux)
-
+**On the Linux host (where QEMU runs):**
 ```bash
 qemu-img info /var/lib/libvirt/images/pve.soc.lab.qcow2
 ```
 
-Shows `virtual size: 272 GiB` but Proxmox only sees a fraction of it.
+Showed `virtual size: 272 GiB` — so the space existed, Proxmox just couldn't use it.
 
-## Fix
+---
 
-### Step 1: Confirm the QEMU Disk File Has Free Virtual Space
+## The Fix
 
-On your **Linux host** (where QEMU runs):
+### Step 1 — Make Proxmox see the full disk
 
+On the **Linux host**, check if the virtual disk is already big:
 ```bash
 qemu-img info /var/lib/libvirt/images/pve.soc.lab.qcow2
 ```
 
-If `virtual size` is already large (e.g., 272 GB), skip to Step 3.
-
-If `virtual size` is small (e.g., 72 GB), resize it first:
-
+If it's small, resize it:
 ```bash
 qemu-img resize /var/lib/libvirt/images/pve.soc.lab.qcow2 +200G
 ```
 
-### Step 2: Reboot Proxmox VM
+Then **reboot Proxmox** so it sees the new space.
 
-After resizing the disk file, reboot Proxmox so it sees the new space:
+### Step 2 — Grow the partition inside Proxmox
 
+On **Proxmox**:
 ```bash
-virsh reboot pve.soc.lab
-# or
-qm reboot <proxmox-vm-id>
-```
-
-### Step 3: Expand the Partition Inside Proxmox
-
-On Proxmox:
-
-```bash
-# Check current partition layout
-fdisk -l /dev/vda
-```
-
-You should see `/dev/vda3` with the old size and free space after it.
-
-```bash
-# Install growpart if not present
 apt install cloud-guest-utils
-
-# Grow partition 3 to fill remaining space
 growpart /dev/vda 3
 ```
 
-**Alternative using fdisk manually:**
-```bash
-fdisk /dev/vda
-# d -> 3 (delete partition 3)
-# n -> 3 (new partition 3, same start sector, use all remaining space)
-# t -> 3 -> 8e (Linux LVM)
-# w (write and exit)
-```
+This expands partition 3 to fill the rest of the disk.
 
-### Step 4: Resize LVM Physical Volume
+### Step 3 — Resize the storage pool
 
 ```bash
 pvresize /dev/vda3
-pvs
-```
-
-`PSize` for `/dev/vda3` should now show ~271 GB.
-
-### Step 5: Expand the Thin Pool
-
-```bash
 lvextend -l +100%FREE /dev/pve/data
-lvs
 ```
 
-Thin pool `data` should now have significant free space.
+Now Proxmox can actually use all the space.
 
-### One-Liner (If You're Feeling Lucky)
+### The Lazy Way
 
+If you're feeling confident, it's just one line:
 ```bash
 growpart /dev/vda 3 && pvresize /dev/vda3 && lvextend -l +100%FREE /dev/pve/data && vgs
 ```
 
-## Verification
+---
+
+## How to Check It's Working
 
 ```bash
 vgs
 ```
 
-Expected:
+Should now show something like:
 ```
   VG  #PV #LV #SN Attr   VSize    VFree
   pve   1   4   0 wz--n- 271.50g 220.00g
 ```
 
+And:
 ```bash
 lvs
 ```
 
-Expected: `data` pool `Data%` should be well under 100%.
+The `data` pool should show `Data%` well under 100%.
 
-```bash
-pvesm status
-```
-
-Expected: `local-lvm` shows plenty of available space.
-
-Try creating a test VM to confirm:
+Try creating a test VM:
 ```bash
 qm create 999 --name test-vm --memory 512 --cores 1 --virtio0 local-lvm:10
 qm destroy 999
 ```
 
-## Lessons Learnt
+If that works, you're good.
 
-| Mistake | Fix |
-|---------|-----|
-| Creating QEMU VM with small disk | Allocate 250 GB+ from the start for a multi-VM lab |
-| Over-provisioning thin pool | Monitor `lvs` Data% regularly; don't promise more than you have |
-| Ignoring thin pool warnings | Set up Proxmox alerts when `local-lvm` exceeds 80% |
-| Force-stopping VMs when pool is full | Always check storage before hard-rebooting VMs — full pools cause corruption |
+---
 
-### Recommended Disk Sizes for SOC Lab
+## If a VM Got Corrupted
 
-| VM | Disk | Notes |
-|----|------|-------|
-| pfSense | 16 GB | Keep small, reinstall if corrupted |
-| Kali Linux | 32 GB | Can shrink from default 64 GB |
-| Windows Server (DC01) | 25 GB | Trimmed down |
-| Windows 10 (WKST01) | 25 GB | Lab workstation |
-| Splunk Enterprise | 40 GB | Logs grow fast |
-| Wazuh SIEM | 40 GB | If using instead of/in addition to Splunk |
-| **Total** | **~176 GB** | Fits comfortably in 250-300 GB |
-
-### Recovery: If ZFS Corruption Already Occurred
-
-If a VM (like pfSense) was corrupted due to the full pool:
+My pfSense VM broke because the pool ran out while it was writing. ZFS corruption from that is usually not fixable.
 
 1. **Fix the storage first** using the steps above
-2. **Rebuild the corrupted VM from ISO** — ZFS corruption from failed writes is usually unrecoverable
-3. **Do not restore from backup** until you are certain the pool has stable free space
+2. **Rebuild the broken VM from ISO** — don't waste time trying to recover a corrupted thin pool VM
+3. **Only restore from backup after** you've confirmed the pool is stable
 
 ```bash
 # Example: rebuild pfSense
@@ -414,4 +285,27 @@ qm create 100 --name pfsense-firewall --memory 1024 --cores 1 \
   --virtio0 local-lvm:16
 # Attach ISO and reinstall
 ```
+
+---
+
+## Lessons Learned
+
+- **Give Proxmox way more disk than you think you need.** I started with too small a virtual disk. For a multi-VM lab, allocate 250–300 GB from the start.
+- **Thin provisioning is a trap if you don't watch it.** It lets you over-allocate, which is fine until everyone actually uses their space. Check `lvs` regularly.
+- **A full pool corrupts VMs.** Don't ignore warnings. When `local-lvm` gets above 80%, do something about it.
+- **Don't hard-reboot VMs when storage is full.** I force-restarted pfSense while the pool was at 100% and that killed it. Fix storage first, then reboot VMs.
+- **The virtual disk size and the usable size are different things.** Just because QEMU says 272 GB doesn't mean Proxmox can use it. You have to grow the partition and the pool.
+
+### Disk Sizes That Work for Me Now
+
+| VM | Disk | Notes |
+|----|------|-------|
+| pfSense | 16 GB | Keep small, easy to rebuild |
+| Kali Linux | 32 GB | Trimmed down from default |
+| Windows Server | 25 GB | Enough for a DC |
+| Windows 10 | 25 GB | Lab workstation |
+| Splunk | 40 GB | Logs grow fast |
+| Wazuh | 40 GB | Indexer needs room |
+| **Total** | **~176 GB** | Comfortable in 250–300 GB |
+
 
