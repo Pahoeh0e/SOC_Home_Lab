@@ -19,7 +19,7 @@ These notes are for:
 
 ## Categories
 - [Network Troubleshooting](/Troubleshooting/Network.md)
-- [Configuration Mistakes](/Troubleshooting/Configuration-Mistakes.md)
+- [Configuration Troubleshooting](/Troubleshooting/Configuration.md)
 
 ## Disclaimer
 All research conducted in an isolated home lab. These are educational notes only.
