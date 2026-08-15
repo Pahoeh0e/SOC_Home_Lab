@@ -7,6 +7,7 @@ Each guide follows the same structure:
 - **Root Cause** — why it happens
 - **Diagnosis** — commands and checks to confirm
 - **Fix** — step-by-step resolution
+- **Verification** - Confirming the fix works
 - **lessons learnt** — how to avoid it next time
 
 
@@ -172,7 +173,269 @@ When creating a Windows VM in Proxmox, set:
 - [ ] **Network → Model:** `Intel E1000` (for install) / `VirtIO` (after driver install)
 - [ ] **Network → Firewall:** ❌ Unchecked (pfSense handles security)
 
-## Related Issues
 
-- [ ] [pfSense WAN Gets `192.168.122.x`](network-pfsense-wan-libvirt-nat.md) — network adapter type must be correct before IP assignment matters
-- [ ] Windows installer says **"No drives found"** — same VirtIO driver issue, but for the disk controller; change disk bus to IDE or load VirtIO storage drivers
+# SSH Tunnel Breaks After Proxmox Reboot — Cannot Access Splunk Web UI
+
+## Symptoms
+
+- Splunk web UI was accessible at `http://localhost:8080` on Kali before reboot
+- After Proxmox host restart, browser shows **"Unable to connect"** or **"Connection refused"**
+- Splunk VM is running (`qm status 105` shows `running`)
+- `ping 192.168.30.11` from Kali succeeds
+- Direct browsing to `http://192.168.30.11:8000` from Kali fails or times out
+- `sudo /opt/splunk/bin/splunk status` on Splunk VM shows **"Splunk is not running"**
+
+## Root Cause
+
+Nested virtualization introduces multiple layers where services can stop after a host reboot:
+
+```
+Your Laptop
+      |
+      +-- SSH tunnel: localhost:8080 ──► Kali:22 ──► Splunk:8000
+              |
+              ▼ (BROKEN after reboot)
+      Kali VM (10.0.0.50)
+              |
+              +-- SSH tunnel process killed by reboot
+              |
+              +-- OR: Splunk service not auto-started
+                      |
+                      Splunk VM (192.168.30.11)
+                              |
+                              +-- Splunk web service on port 8000
+```
+
+There are **three independent failure points**:
+
+1. **SSH tunnel on Kali was killed** — tunnels are not persistent across reboots
+2. **Splunk service did not auto-start** — may need `enable-boot-start` configuration
+3. **Splunk web port not listening** — service started but web component failed
+
+## Diagnosis
+
+### Step 1: Check If Splunk Is Running (On Splunk VM)
+
+SSH into Splunk VM from Proxmox console or Kali:
+
+```bash
+sudo /opt/splunk/bin/splunk status
+```
+
+**Problem:**
+```
+Splunk is not running.
+```
+
+**Working:**
+```
+Splunk is running on this machine.
+```
+
+### Step 2: Check If Splunk Web Port Is Listening
+
+On Splunk VM:
+
+```bash
+sudo ss -tlnp | grep 8000
+# or
+sudo netstat -tlnp | grep 8000
+```
+
+**Problem:**
+```
+(nothing returned)
+```
+
+**Working:**
+```
+LISTEN 0 128 0.0.0.0:8000 users:(("splunkd",pid=1234,fd=89))
+```
+
+### Step 3: Check If SSH Tunnel Exists (On Kali)
+
+```bash
+ps aux | grep ssh
+ss -tlnp | grep 8080
+```
+
+**Problem:**
+```
+(nothing on port 8080, no ssh tunnel process)
+```
+
+**Working:**
+```
+LISTEN 0 128 127.0.0.1:8080 users:(("ssh",pid=5678,fd=5))
+```
+
+### Step 4: Test Direct Connectivity
+
+From Kali:
+
+```bash
+ping 192.168.30.11
+curl -I http://192.168.30.11:8000
+```
+
+If `ping` works but `curl` fails, Splunk web service is down.
+If `ping` fails, check network/VLAN routing.
+
+## Fix
+
+### Fix 1: Start Splunk Service (If Not Running)
+
+On Splunk VM:
+
+```bash
+sudo /opt/splunk/bin/splunk start
+```
+
+To make it auto-start on boot:
+
+```bash
+sudo /opt/splunk/bin/splunk enable boot-start
+```
+
+Verify:
+```bash
+sudo /opt/splunk/bin/splunk status
+sudo ss -tlnp | grep 8000
+```
+
+### Fix 2: Recreate SSH Tunnel (On Kali)
+
+If Splunk is running but you access it via tunnel:
+
+```bash
+ssh -L 8080:192.168.30.11:8000 ubuntu@192.168.30.11
+```
+
+Keep this terminal open. Then browse on Kali:
+```
+http://localhost:8080
+```
+
+**To run in background:**
+```bash
+ssh -fN -L 8080:192.168.30.11:8000 ubuntu@192.168.30.11
+```
+
+**To kill the tunnel later:**
+```bash
+ps aux | grep "ssh -fN -L 8080"
+kill <PID>
+```
+
+### Fix 3: Access Splunk Directly (No Tunnel)
+
+If Kali and Splunk are on the same VLAN or routing is configured:
+
+```bash
+# From Kali, test direct access
+curl http://192.168.30.11:8000
+```
+
+If this works, you can browse directly:
+```
+http://192.168.30.11:8000
+```
+
+If it fails, check:
+- pfSense firewall rules allowing MGMT VLAN access
+- Splunk `web.conf` binding to `0.0.0.0` not just `127.0.0.1`
+
+### Fix 4: Check Splunk Web Bind Address
+
+On Splunk VM:
+
+```bash
+cat /opt/splunk/etc/system/local/web.conf
+```
+
+If it contains:
+```ini
+[settings]
+httpport = 8000
+mgmtHostPort = 127.0.0.1:8089
+```
+
+The web UI should bind to all interfaces by default. If it explicitly says:
+```ini
+host = 127.0.0.1
+```
+
+Change to:
+```ini
+host = 0.0.0.0
+```
+
+Then restart Splunk:
+```bash
+sudo /opt/splunk/bin/splunk restart
+```
+
+## Verification
+
+| Check | Command | Expected Result |
+|-------|---------|----------------|
+| Splunk running | `sudo /opt/splunk/bin/splunk status` | `Splunk is running` |
+| Web port open | `sudo ss -tlnp \| grep 8000` | `0.0.0.0:8000` |
+| Tunnel active | `ss -tlnp \| grep 8080` (on Kali) | `127.0.0.1:8080` |
+| Web UI loads | `curl http://localhost:8080` (on Kali) | HTML response |
+
+## Lessons Learnt
+
+### Make Splunk Auto-Start
+
+```bash
+sudo /opt/splunk/bin/splunk enable boot-start
+```
+
+### Create a Persistent Tunnel Script on Kali
+
+Save as `~/splunk-tunnel.sh`:
+
+```bash
+#!/bin/bash
+# Splunk SSH tunnel — run after Kali boots
+
+TUNNEL_PID=$(pgrep -f "ssh.*-L 8080:192.168.30.11:8000")
+
+if [ -n "$TUNNEL_PID" ]; then
+    echo "Tunnel already running (PID: $TUNNEL_PID)"
+else
+    echo "Starting Splunk SSH tunnel..."
+    ssh -fN -L 8080:192.168.30.11:8000 ubuntu@192.168.30.11
+    echo "Tunnel started. Browse to http://localhost:8080"
+fi
+```
+
+Make executable:
+```bash
+chmod +x ~/splunk-tunnel.sh
+```
+
+Run after each reboot:
+```bash
+~/splunk-tunnel.sh
+```
+
+### Alternative: Use Proxmox Port Forwarding
+
+Instead of SSH tunnels, configure pfSense or Proxmox to forward a port directly to Splunk:
+
+**pfSense:**
+- Firewall → NAT → Port Forward
+- Interface: WAN (or LAN)
+- Protocol: TCP
+- Destination: WAN address
+- Destination Port: 8000
+- Redirect Target IP: 192.168.30.11
+- Redirect Target Port: 8000
+
+Then access from your laptop directly:
+```
+http://<pfSense-LAN-IP>:8000
+```
+
