@@ -12,7 +12,8 @@ Each guide follows the same structure:
 
 
 ## Index:
-- [VM Network bridge](#VM-Network-Bridge-not-working)
+- [VM Network Bridge](#VM-Network-Bridge-not-working)
+- [Wazuh Agent Unreachable](#Wazuh-Agent-Unreachable)
 - [Splunk Web UI not Accessbible](#Splunk-Web-UI-Not-Accessible)
 
 
@@ -156,6 +157,339 @@ When creating a Windows VM in Proxmox, set:
 - [ ] **Disks → Bus/Device:** `IDE` or `SATA` (for install) / `VirtIO Block` (if loading drivers)
 - [ ] **Network → Model:** `Intel E1000` (for install) / `VirtIO` (after driver install)
 - [ ] **Network → Firewall:** ❌ Unchecked (pfSense handles security)
+
+
+# Wazuh Agent Unreachable
+
+
+## Symptoms
+
+- `sudo /var/ossec/bin/agent_control -l` shows the agent as `Unknown` or `Never connected`
+- Agent was previously `Active` but reverted to `Unknown` after a reboot or manager restart
+- `agent-auth.exe` on Windows returns `Agent added` but the agent still shows `Never connected`
+- `wazuh-authd` is not running on the manager; port 1515 is not listening
+- Custom rules are loaded but no alerts appear in `alerts.log` or `alerts.json`
+- Wazuh Dashboard web UI shows **"server is not ready"** or no Security Events
+- Repeatedly deleting and re-registering the agent works briefly, then fails again
+
+## Root Cause
+
+Wazuh agent-to-manager communication involves **three separate services** and **two distinct ports**. A failure at any layer breaks the pipeline:
+
+```
+Windows Agent                          Wazuh Manager
+    │                                        │
+    ├──► authd (port 1515) ──► key exchange   │  [Registration]
+    │      (wazuh-authd)                       │
+    │                                        │
+    ├──► remoted (port 1514) ──► keepalives   │  [Persistent connection]
+    │      (wazuh-remoted)                     │
+    │                                        │
+    │         Sysmon/EventLog events ──► analysisd ──► alerts.log/json
+    │                                        │  [Analysis & alerting]
+    │                                        │
+    │         alerts.json ──► indexer ──► dashboard
+    │                                        │  [Web UI visibility]
+```
+
+Common failure points:
+
+| Layer | Service | Port | Symptom When Broken |
+|-------|---------|------|---------------------|
+| Registration | `wazuh-authd` | 1515 | `agent-auth.exe` fails or times out |
+| Connection | `wazuh-remoted` | 1514 | Agent shows `Never connected` after auth |
+| Analysis | `wazuh-analysisd` | — | Events arrive but no alerts in `alerts.log` |
+| Indexing | `wazuh-indexer` | 9200 | Alerts in `alerts.json` but not in web UI |
+| Dashboard | `wazuh-dashboard` | 443 | Web UI shows "server is not ready" |
+
+## Diagnosis
+
+### Step 1: Check All Wazuh Services on the Manager
+
+```bash
+sudo /var/ossec/bin/wazuh-control status
+```
+
+**Problem (authd down):**
+```
+wazuh-authd not running...
+wazuh-remoted is running...
+wazuh-analysisd is running...
+```
+
+**Problem (remoted down):**
+```
+wazuh-authd is running...
+wazuh-remoted not running...
+```
+
+**Working:**
+```
+wazuh-authd is running...
+wazuh-remoted is running...
+wazuh-analysisd is running...
+wazuh-db is running...
+```
+
+### Step 2: Check Network Ports
+
+```bash
+sudo ss -tlnp | grep -E "1514|1515|9200"
+```
+
+**Problem:**
+```
+(nothing on 1514 or 1515)
+```
+
+**Working:**
+```
+LISTEN 0 128 0.0.0.0:1514 users:(("wazuh-remoted",pid=1234,fd=5))
+LISTEN 0 128 0.0.0.0:1515 users:(("wazuh-authd",pid=1235,fd=3))
+LISTEN 0 128 0.0.0.0:9200 users:(("java",pid=1236,fd=200))
+```
+
+### Step 3: Check Agent State on Windows
+
+```powershell
+# Check if agent service is running
+Get-Service -Name WazuhSvc
+
+# Check agent log for connection errors
+Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 30
+
+# Test TCP to manager ports
+Test-NetConnection -ComputerName 192.168.30.12 -Port 1514
+Test-NetConnection -ComputerName 192.168.30.12 -Port 1515
+```
+
+### Step 4: Check for Duplicate Agent Entries
+
+```bash
+# On manager — check client.keys for duplicates
+sudo cat /var/ossec/etc/client.keys
+
+# Check agent database
+sudo sqlite3 /var/ossec/queue/db/global.db "SELECT id, name, ip, status FROM agent;"
+```
+
+**Problem:**
+```
+001 WIN-52U4HN70935 any 192.168.30.12
+001 WIN-52U4HN70935 any 192.168.30.12
+```
+(Duplicate entries for the same agent ID)
+
+### Step 5: Verify Alerts Are Being Generated
+
+```bash
+# Check if ANY alerts exist (not just custom rules)
+sudo tail -n 20 /var/ossec/logs/alerts/alerts.log
+
+# Check JSON alerts (what the indexer reads)
+sudo tail -n 5 /var/ossec/logs/alerts/alerts.json
+
+# Check if Sysmon events are reaching the manager at all
+sudo tail -n 20 /var/ossec/logs/archives/archives.log 2>/dev/null | grep -i "sysmon\|powershell"
+```
+
+### Step 6: Check Indexer and Dashboard Services
+
+```bash
+sudo systemctl status wazuh-indexer --no-pager
+sudo systemctl status wazuh-dashboard --no-pager
+```
+
+**Problem:**
+```
+wazuh-indexer.service — failed
+```
+
+## Fix
+
+### Fix 1: Start Missing Services
+
+If `wazuh-authd` is not running:
+
+```bash
+sudo /var/ossec/bin/wazuh-authd
+sudo ss -tlnp | grep 1515
+```
+
+If `wazuh-indexer` is down:
+
+```bash
+sudo systemctl enable wazuh-indexer
+sudo systemctl start wazuh-indexer
+sleep 30
+sudo systemctl status wazuh-indexer --no-pager
+```
+
+If `wazuh-dashboard` is down:
+
+```bash
+sudo systemctl enable wazuh-dashboard
+sudo systemctl start wazuh-dashboard
+```
+
+Enable **all** services to start on boot:
+
+```bash
+sudo systemctl enable wazuh-manager wazuh-indexer wazuh-dashboard
+```
+
+### Fix 2: Remove Duplicate Agent and Re-register
+
+On the **manager**:
+
+```bash
+# Remove the agent completely
+sudo /var/ossec/bin/manage_agents -r 001
+
+# Verify it's gone
+sudo cat /var/ossec/etc/client.keys
+
+# If still there, manually edit
+sudo nano /var/ossec/etc/client.keys
+# Delete the line with the duplicate agent, save
+
+# Restart manager to clear caches
+sudo systemctl restart wazuh-manager
+```
+
+On **Windows**:
+
+```powershell
+# Stop agent
+Stop-Service -Name WazuhSvc
+
+# Remove old keys and state
+Remove-Item "C:\Program Files (x86)\ossec-agent\client.keys" -Force
+Remove-Item "C:\Program Files (x86)\ossec-agent\ossec-agent.state" -ErrorAction SilentlyContinue
+
+# Re-register
+cd "C:\Program Files (x86)\ossec-agent"
+.\agent-auth.exe -m 192.168.30.12 -A WIN-52U4HN70935
+
+# Start agent
+Start-Service -Name WazuhSvc
+```
+
+Wait 30 seconds, then verify on the manager:
+
+```bash
+sudo /var/ossec/bin/agent_control -l
+```
+
+### Fix 3: Fix "Never Connected" After Successful Registration
+
+If `agent-auth.exe` succeeded but `agent_control -l` shows `Never connected`:
+
+1. **Check remoted is listening:**
+   ```bash
+   sudo ss -tlnp | grep 1514
+   ```
+
+2. **Test from Windows:**
+   ```powershell
+   Test-NetConnection -ComputerName 192.168.30.12 -Port 1514
+   ```
+
+3. **Restart the Windows agent service:**
+   ```powershell
+   Stop-Service -Name WazuhSvc
+   Start-Sleep -Seconds 5
+   Start-Service -Name WazuhSvc
+   ```
+
+4. **Check Windows agent log for errors:**
+   ```powershell
+   Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 30
+   ```
+
+### Fix 4: Force Indexer to Pick Up New Alerts
+
+If alerts exist in `alerts.json` but the web UI shows nothing:
+
+```bash
+# Restart indexer and dashboard
+sudo systemctl restart wazuh-indexer
+sleep 30
+sudo systemctl restart wazuh-dashboard
+
+# Check indexer is actually indexing
+sudo curl -k -u admin:admin https://localhost:9200/_cat/indices?v | grep wazuh
+```
+
+Also check the time range in the web UI — alerts may be outside the default 24-hour window.
+
+### Fix 5: Full Pipeline Reset (Nuclear Option)
+
+If the agent keeps cycling between `Active` and `Unknown`:
+
+```bash
+# On manager — kill everything
+sudo systemctl stop wazuh-manager wazuh-indexer wazuh-dashboard
+sudo pkill -9 -f wazuh
+sudo pkill -9 -f ossec
+
+# Clean stale state
+sudo rm -f /var/ossec/var/run/*.pid
+sudo rm -f /var/ossec/var/run/*.lock
+sudo rm -f /var/ossec/queue/db/wdb
+sudo rm -f /var/ossec/queue/agents-tmp/*
+
+# Fix permissions
+sudo chown -R wazuh:wazuh /var/ossec
+
+# Start fresh
+sudo systemctl start wazuh-manager
+sleep 10
+sudo systemctl start wazuh-indexer
+sleep 30
+sudo systemctl start wazuh-dashboard
+```
+
+## Verification
+
+| Check | Command | Expected Result |
+|-------|---------|----------------|
+| All services running | `sudo /var/ossec/bin/wazuh-control status` | All services show `is running` |
+| Ports listening | `sudo ss -tlnp \| grep -E "1514\|1515\|9200"` | All three ports listed |
+| Agent connected | `sudo /var/ossec/bin/agent_control -l` | Status shows `Active` |
+| Alerts generating | `sudo tail -n 5 /var/ossec/logs/alerts/alerts.json` | JSON events with timestamps |
+| Web UI ready | `curl -k https://192.168.30.12` | Returns HTML (login page) |
+| Custom rules firing | `sudo grep "100001" /var/ossec/logs/alerts/alerts.log` | Alert entries found |
+
+## Prevention
+
+| Practice | Why |
+|----------|-----|
+| **Enable all Wazuh services on boot** | `systemctl enable wazuh-manager wazuh-indexer wazuh-dashboard` |
+| **Use static manager IP in `ossec.conf`** | Prevents agent confusion if DHCP changes |
+| **Never manually edit `client.keys`** | Use `manage_agents` to avoid corruption |
+| **Check `wazuh-control status` after any manager reboot** | Catches authd/indexer failures early |
+| **Monitor `agent_control -l` after agent reboots** | Detects "Never connected" before testing |
+
+### Post-Reboot Checklist
+
+After any Proxmox host or Wazuh VM reboot:
+
+- [ ] `sudo /var/ossec/bin/wazuh-control status` — all services running
+- [ ] `sudo ss -tlnp | grep 1514` — remoted listening
+- [ ] `sudo ss -tlnp | grep 1515` — authd listening (only needed for new registrations)
+- [ ] `sudo /var/ossec/bin/agent_control -l` — all agents `Active`
+- [ ] `sudo systemctl status wazuh-indexer` — indexer running
+- [ ] `sudo systemctl status wazuh-dashboard` — dashboard running
+- [ ] Wazuh web UI loads without "server is not ready" error
+
+## Related Issues
+
+- [ ] [Splunk SSH Tunnel Broken After Reboot](network-ssh-tunnel-splunk-web-ui-access.md) — similar service-not-started issue on a different VM
+- [ ] [Proxmox Thin Pool Full](storage-proxmox-thin-pool-full.md) — disk pressure can cause Wazuh indexer to crash or fail to start
+- [ ] [Windows Defender Blocking Payloads](lab-windows-defender-blocking-payloads.md) — if Sysmon/Wazuh agent processes are quarantined, agent stops sending events
+
+
 
 
 # Splunk Web UI Not Accessible
