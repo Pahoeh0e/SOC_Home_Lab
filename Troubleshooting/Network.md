@@ -175,7 +175,7 @@ After applying Option 1 or 2:
    ```
    Should load the pfSense login page.
 
-## Prevention
+## Lessons Learnt
 
 When creating the Proxmox VM in virt-manager for the first time, always set the network to bridge/MacVTap mode instead of the default NAT:
 
@@ -188,12 +188,6 @@ If you are on **WiFi only** and MacVTap does not work with your wireless card, c
 - Using a USB-to-Ethernet adapter for the Linux host
 - Creating a routed network in libvirt instead of NAT
 - Using Option 3/4 as a permanent workaround
-
-## Related Issues
-
-- [ ] pfSense install fails at package fetch (68/182) — caused by no internet access due to this NAT issue
-- [ ] Proxmox cannot reach internet for updates — same root cause
-- [ ] Cannot access Proxmox web UI from laptop — Proxmox is also on `192.168.122.x`
 
 
 
@@ -383,7 +377,7 @@ qm create 999 --name test-vm --memory 512 --cores 1 --virtio0 local-lvm:10
 qm destroy 999
 ```
 
-## Prevention
+## Lessons Learnt
 
 | Mistake | Fix |
 |---------|-----|
@@ -404,7 +398,7 @@ qm destroy 999
 | Wazuh SIEM | 40 GB | If using instead of/in addition to Splunk |
 | **Total** | **~176 GB** | Fits comfortably in 250-300 GB |
 
-## Recovery: If ZFS Corruption Already Occurred
+### Recovery: If ZFS Corruption Already Occurred
 
 If a VM (like pfSense) was corrupted due to the full pool:
 
@@ -420,10 +414,4 @@ qm create 100 --name pfsense-firewall --memory 1024 --cores 1 \
   --virtio0 local-lvm:16
 # Attach ISO and reinstall
 ```
-
-## Related Issues
-
-- [ ] [pfSense WAN Gets `192.168.122.x`](network-pfsense-wan-libvirt-nat.md) — may occur while troubleshooting storage if network settings are changed
-- [ ] Windows Server install fails with "No drives found" — can happen if thin pool is too full to allocate VM disk
-
 
