@@ -174,7 +174,7 @@ When creating a Windows VM in Proxmox, set:
 Nested virtualization introduces multiple layers where services can stop after a host reboot:
 
 ```
-Your Laptop
+My PC
       |
       +-- SSH tunnel: localhost:8080 ──► Kali:22 ──► Splunk:8000
               |
@@ -418,7 +418,7 @@ Instead of SSH tunnels, configure pfSense or Proxmox to forward a port directly 
 - Redirect Target IP: 192.168.30.11
 - Redirect Target Port: 8000
 
-Then access from your laptop directly:
+Then access from my PC directly:
 ```
 http://<pfSense-LAN-IP>:8000
 ```
