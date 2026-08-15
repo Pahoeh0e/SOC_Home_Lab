@@ -18,8 +18,8 @@ These notes are for:
 - **Attacker:** Kali Linux
 
 ## Categories
-- [Network Troubleshooting](/network-troubleshooting/)
-- [Configuration Mistakes](/configuration-mistakes/)
+- [Network Troubleshooting](/Network.md)
+- [Configuration Mistakes](/Configuration-Mistakes.md)
 
 ## Disclaimer
 All research conducted in an isolated home lab. These are educational notes only.
