@@ -2,7 +2,7 @@
 
 See [Network Architecture](ARCHITECTURE.md) for the full architecture 
 
-# Format
+## Format
 
 Each guide follows the same structure:
 - **Symptoms** — what you see when the issue occurs
@@ -12,7 +12,7 @@ Each guide follows the same structure:
 - **lessons learnt** — how to avoid it next time
 
 
-Index:
+## Index:
 - [pfSense Web UI access](#Accessing-pfSense-Web-UI) 
 - [Proxmox pool storage](#Proxmox-Storage)
 
