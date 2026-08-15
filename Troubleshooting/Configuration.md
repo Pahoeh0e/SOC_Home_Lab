@@ -508,179 +508,183 @@ Run it after every reboot:
 
 # Splunk Dashboard Field Errors
 
-**Category:** Wazuh / Splunk Dashboards  
-**Lab Context:** Custom Wazuh rules not showing correctly in Splunk dashboards  
-**Applies To:** Splunk ingesting Wazuh alerts
+> **Lab:** Home SOC Lab (Proxmox)  
+> **Tools:** Wazuh, Splunk, Sysmon  
+> **Goal:** Build a kill-chain dashboard ("Operation Feeding Time") to track custom Wazuh alerts
 
 ---
 
-## What Went Wrong
+## What I Was Trying to Do
 
-I built a Splunk dashboard to show my custom Wazuh alerts. Some panels worked, but others showed weird errors or just stayed blank. I thought my rules weren't firing, but the alerts were actually there — Splunk just couldn't read the fields properly.
+I built a Splunk dashboard to visualise an end-to-end kill chain:
 
----
+**Phishing → Macro → PowerShell → Credential Dump → Lateral Movement → Exfiltration**
 
-## The Problems I Hit
-
-| What I Saw | Why It Happened |
-|-----------|----------------|
-| `The '>=' operator received different types` | `rule.level` is a **string** (text), not a number. You can't do `>=` on text. |
-| MITRE technique panel shows `0` | The field is called `rule.mitre.id{}` (with curly braces), not `rule.mitre.id` |
-| IP address column is blank | The field name I used didn't exist. Wazuh calls it something else. |
-| Some rules missing from dashboard | I forgot to add the new rule IDs to the dashboard filter |
-| GitHub README images broken | I typed `!{}` instead of `![]` in Markdown |
+Some panels worked straight away, but others broke or stayed blank. I had to figure out whether my Wazuh rules weren't firing, or whether Splunk just couldn't read the fields properly.
 
 ---
 
-## Diagnosis
+## Problem 1: Type Error in Risk Score
 
-### Check 1 — What type is the field?
+**What I saw:** The *Host Risk Score* panel showed this error:
 
-In Splunk Search, run:
+> `Error in 'EvalCommand': Type checking failed. The '>=' operator received different types.`
+
+![Type mismatch error](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors13.png)
+
+**My thought process:** I thought `rule.level` was a number because it looks like one (e.g. `10`, `12`). But Splunk extracts it as a **string** (text). You can't do `>=` on text.
+
+**How I Figured It Out:**
 ```spl
-index=wazuh sourcetype=wazuh rule.id=100001
+index=wazuh sourcetype=wazuh rule.id=100105
 | eval level_type=typeof(rule.level)
 | table rule.level, level_type
 ```
 
-If it says **String**, that's your problem. You need to convert it before comparing.
-
-### Check 2 — What is the actual field name?
-
-In Splunk Search:
+**The fix:** Wrap it in `tonumber()` before comparing:
 ```spl
-index=wazuh sourcetype=wazuh rule.id=100001
-| fieldsummary
-| search field="*mitre*"
+| eval severity=case(
+    tonumber(rule.level)>=12, "Critical",
+    tonumber(rule.level)>=8, "High",
+    1=1, "Low"
+  )
 ```
 
-Look at what Splunk actually extracted. In my case it was `rule.mitre.id{}` — the `{}` at the end matters.
+---
 
-### Check 3 — Which IP field has data?
+## Problem 2: MITRE Panel Showed `0`
 
-Test different names:
+**What I saw:** The *MITRE ATT&CK Coverage* panel showed a big `0`, even though my rules had MITRE tags.
+
+![MITRE showing zero](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors3.png)
+
+**My thought process:** I was searching for `rule.mitre.id`, but when I looked at the raw event fields, the actual name had curly braces on the end.
+
+**How I Figured It Out:**
 ```spl
-index=wazuh sourcetype=wazuh rule.id=100001
+index=wazuh sourcetype=wazuh rule.id="100105"
+| head 1
+| table rule.mitre*
+```
+
+![MITRE fields with curly braces](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors1.png)
+
+The field is called `rule.mitre.id{}` — those two characters `{}` matter because it's a **multivalue** field.
+
+**The fix:**
+```spl
+| eval mitre_id=mvindex('rule.mitre.id{}', 0)
+| stats dc(mitre_id) as techniques
+```
+
+> **Note:** In Splunk dashboard XML, you must wrap curly-brace fields in **single quotes**.
+
+I also checked `fieldsummary` to confirm the field existed, which showed the MITRE fields but with zero counts — that was a red herring because `fieldsummary` after `head 1` only sees one event.
+
+![Fieldsummary MITRE count zero](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors2.png)
+
+---
+
+## Problem 3: `rule_id` Column Was `Null`
+
+**How I Figured It Out:** In the *Endpoint Alert* table, the `rule_id` column showed `Null` for every row, but `rule.description` was fine.
+
+![Null rule_id column](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors11.png)
+
+**My thought process:** The dashboard XML or search was referencing a field name that didn't match what Splunk extracted. I needed to make sure `rule.id` was explicitly passed through to the table.
+
+**The fix:** Explicitly create the field in the search:
+```spl
+| eval rule_id=rule.id
+| table _time, rule_id, rule.description, endpoint_ip, uri, status, user_agent
+```
+
+---
+
+## Problem 4: Empty Map and "No Results Found"
+
+**What I saw:** The *Staging Server Activity* panel said "No results found" and the *Source IPs Hitting Staging Server* map was completely blank.
+
+![Empty staging server and map](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors4.png)
+
+**My thought process:** Two things were wrong here:
+1. I was using `win.eventdata.sourceIp` but that field didn't exist in these events.
+2. My dashboard filter (`rule.id IN (...)`) was missing some of the rule IDs that actually had data.
+
+**How I checked which IP field had data:**
+```spl
+index=wazuh sourcetype=wazuh rule.id=100105
 | eval ip_1=agent.ip
 | eval ip_2=data.srcip
 | eval ip_3=win.eventdata.sourceIp
 | table ip_1, ip_2, ip_3
 ```
 
-Use whichever one actually shows a value.
+![Agent IP populated in raw event](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors8.png)
 
----
+`agent.ip` (e.g. `10.0.0.101`) and `data.srcip` had values.
 
-## Fixes
-
-### Fix 1 — Convert `rule.level` to a number
-
-**Broken:**
-```spl
-| eval severity=case(rule.level>=12, "Critical", rule.level>=8, "High", 1=1, "Low")
-```
-
-**Fixed:**
-```spl
-| eval severity=case(tonumber(rule.level)>=12, "Critical", tonumber(rule.level)>=8, "High", 1=1, "Low")
-```
-
-`tonumber()` turns the text "10" into the number 10 so `>=` works.
-
-### Fix 2 — Handle the MITRE field properly
-
-**Broken:**
-```spl
-| stats dc(rule.mitre.id) as techniques
-```
-
-**Fixed:**
-```spl
-| eval mitre_id=mvindex('rule.mitre.id{}', 0)
-| stats dc(mitre_id) as techniques
-```
-
-The curly braces mean it's a multivalue field. `mvindex()` pulls out the first value. And you must wrap it in **single quotes** in Splunk XML dashboards.
-
-### Fix 3 — Use the right IP field
-
-**Broken:**
-```spl
-| table win.eventdata.sourceIp
-```
-
-**Fixed:**
-```spl
-| eval endpoint_ip=coalesce(agent.ip, data.srcip, "unknown")
-| table endpoint_ip
-```
-
-`coalesce()` tries each field and uses the first one that has a value. `"unknown"` is a fallback so the panel never stays blank.
-
-### Fix 4 — Include all your rule IDs
-
-If you add a new rule (e.g. 100400) but your dashboard filter only lists the old ones, the new alert won't appear.
-
-**Check what rules actually have alerts:**
+I also checked which rules had alerts in the index:
 ```spl
 index=wazuh sourcetype=wazuh
 | stats count by rule.id
 | sort rule.id
 ```
 
-Then make sure your dashboard includes all of them in its `rule.id IN (...)` filter.
+![Stats count by rule.id](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors6.png)
 
-### Fix 5 — Fix GitHub image links
-
-**Broken:**
-```markdown
-!{}(screenshots/alert.png)
+**The fix:** Use `coalesce()` to try multiple IP fields, and update the `rule.id` filter:
+```spl
+| eval endpoint_ip=coalesce(agent.ip, data.srcip, "unknown")
 ```
-
-**Fixed:**
-```markdown
-![Wazuh Alert](screenshots/alert.png)
-```
-
-Syntax is: `![description](path)` — square brackets, not curly braces.
 
 ---
 
-## Quick Reference — Common Wazuh Fields in Splunk
+## Problem 5: Timeline Showed "Unknown"
+
+**What I saw:** The *Kill Chain Timeline* had a legend entry called `Unknown` instead of the actual kill-chain phases.
+
+![Timeline showing Unknown](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors12.png)
+
+**My thought process:** The field I was using to split the chart series didn't exist or wasn't populated, so Splunk defaulted everything to `Unknown`.
+
+**The fix:** Explicitly map rule IDs to phases:
+```spl
+| eval phase=case(
+    rule.id="100001", "Initial Access",
+    rule.id="100105", "Execution",
+    rule.id="100018", "Exfiltration",
+    1=1, "Other"
+  )
+| timechart count by phase
+```
+
+After the fix, the timeline showed proper spikes with correct phase labels:
+
+![Working timeline](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors14.png)
+
+---
+
+## Quick Reference — Wazuh Fields in Splunk
 
 | What You Want | Field Name | Type | Tip |
 |--------------|-----------|------|-----|
-| Rule ID | `rule.id` | String | Use `tonumber()` if doing math |
+| Rule ID | `rule.id` | String | Use `tonumber()` for math |
 | Rule Level | `rule.level` | String | Always convert with `tonumber()` |
 | MITRE ID | `rule.mitre.id{}` | Multivalue | Use `mvindex('field', 0)` |
 | Agent Name | `agent.name` | String | Usually reliable |
-| IP Address | `agent.ip` or `data.srcip` | String | Use `coalesce()` as fallback |
+| Agent IP | `agent.ip` | String | Fallback to `data.srcip` |
+| Source IP | `data.srcip` | String | Network-based rules |
 | Timestamp | `_time` | Time | Built into Splunk |
 
 ---
 
-## Lessons Learned
+## Lessons Learnt
 
-- **Don't assume field names or types.** Just because it looks like a number doesn't mean Splunk treats it as one. Always check with `typeof()`.
-- **Curly braces in field names are real.** Wazuh sends `rule.mitre.id{}` not `rule.mitre.id`. Missing those two characters breaks the whole panel.
-- **Test in Splunk Search first.** Dashboard XML is harder to debug. Get the search working, then paste it into the dashboard.
-- **Use `coalesce()` for fields that might be empty.** It keeps your dashboard looking clean instead of showing blanks.
-- **Markdown typos are embarrassing.** `![]` not `!{}`. I checked my XML for hours before realising the README was the problem.
-
-### Wazuh-to-Splunk Field Reference (Common Mappings)
-
-| Concept | Wazuh Field | Splunk Type | Notes |
-|---------|-------------|-------------|-------|
-| Rule ID | `rule.id` | String | Use `tonumber()` for math |
-| Rule Level | `rule.level` | String | Use `tonumber()` for comparisons |
-| MITRE ID | `rule.mitre.id{}` | Multivalue | Use `mvindex()` to extract |
-| MITRE Tactic | `rule.mitre.tactic{}` | Multivalue | Use `mvindex()` to extract |
-| Agent Name | `agent.name` | String | Reliable |
-| Agent IP | `agent.ip` | String | May be missing; fallback to `data.srcip` |
-| Source IP | `data.srcip` | String | Network-based rules |
-| Process Image | `win.eventdata.image` | String | Sysmon Event ID 1 |
-| Command Line | `win.eventdata.commandLine` | String | Sysmon Event ID 1 |
-| Parent Image | `win.eventdata.parentImage` | String | Sysmon Event ID 1 |
-| Target Image | `win.eventdata.targetImage` | String | Sysmon Event ID 10 |
-| Timestamp | `_time` | Time | Splunk-native, always present |
+1. **Don't assume a field is a number just because it looks like one.** Always check with `typeof()`.
+2. **Curly braces in field names are real.** `rule.mitre.id{}` is not the same as `rule.mitre.id`.
+3. **Test in Splunk Search first.** Dashboard XML is harder to debug. Get the search working, then paste it in.
+4. **Use `coalesce()` for fields that might be empty.** It stops panels showing blanks.
+5. **Update your filters when you add new rules.** If `rule.id IN (...)` is stale, new alerts just vanish.
+6. **`Null` in a table usually means a field name mismatch.** Splunk won't error — it'll just show `Null`.
 
