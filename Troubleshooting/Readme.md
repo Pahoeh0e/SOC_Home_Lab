@@ -20,7 +20,6 @@ These notes are for:
 ## Categories
 - [Network Troubleshooting](/network-troubleshooting/)
 - [Configuration Mistakes](/configuration-mistakes/)
-- [Lessons Learned](/lessons-learned/)
 
 ## Disclaimer
 All research conducted in an isolated home lab. These are educational notes only.
