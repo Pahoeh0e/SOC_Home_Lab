@@ -92,7 +92,7 @@ net0: e1000=XX:XX:XX:XX:XX:XX,bridge=vmbr1
 
 ## Fix
 
-### Option A: Switch to E1000 (Recommended for Install / Lab)
+### Option A: Switch to E1000 
 
 Fastest fix — no driver needed.
 
@@ -118,24 +118,7 @@ Better long-term performance, but requires extra steps.
    - Click **OK** → **Next** → Install
 4. **Verify:** Adapter now shows as **Red Hat VirtIO Ethernet Adapter**
 
-### Option C: Change Both Disk AND Network to IDE/E1000 (Skip VirtIO Entirely)
 
-For a lab where you want zero driver hassle:
-
-| Device | Change To |
-|--------|-----------|
-| Hard Disk | `IDE` or `SATA` |
-| CD/DVD Drive | `IDE` (default) |
-| Network | `Intel E1000` |
-
-**Trade-off:** ~5-10% performance loss vs VirtIO, but saves 30+ minutes of driver wrangling.
-
-## Verification
-
-### In Windows
-
-```cmd
-ipconfig /all
 ```
 
 Should show:
