@@ -208,7 +208,7 @@ If you are on **WiFi only** and MacVTap does not work with your wireless card, c
 - Existing VMs crash or fail to write: pfSense shows `ZFS error 5`, `mounting from zfs:pfsense/root/default failed`
 - `qemu-img info` on the Proxmox VM disk file shows `virtual size: 272 GiB` but `disk size: 53 GiB` — the virtual disk is large but the filesystem inside hasn't been expanded
 
-[vgs screenshot](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-06-14%2013-50-37.png)
+[vgs.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-06-14%2013-50-37.png)
 
 ## Root Cause
 
