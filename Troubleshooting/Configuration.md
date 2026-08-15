@@ -180,6 +180,8 @@ grep -A 2 "<server>" /var/ossec/etc/ossec.conf
 Get-Content "C:\Program Files (x86)\ossec-agent\ossec.conf" | Select-String -Pattern "<address>"
 ```
 
+![Get-content.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ossec.log.png)
+
 Make sure the IP matches your Wazuh Manager. I had mine pointing to an old subnet after moving the VM to a new VLAN.
 
 ---
@@ -196,6 +198,7 @@ nc -zv <MANAGER_IP> 1514
 ```powershell
 Test-NetConnection -ComputerName <MANAGER_IP> -Port 1515
 Test-NetConnection -ComputerName <MANAGER_IP> -Port 1514
+
 ```
 
 If either test fails, a firewall is blocking the path. In my lab, pfSense was dropping traffic between VLANs until I added a pass rule.
@@ -213,7 +216,7 @@ You should see both ports listed. If 1515 is missing, the auth service is not ru
 ```bash
 sudo systemctl restart wazuh-manager
 ```
-
+![psaux.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ps-aux.png)
 ---
 
 ### Check 4 — Duplicate agent names
@@ -222,6 +225,7 @@ sudo systemctl restart wazuh-manager
 ```bash
 sudo /var/ossec/bin/manage_agents -l
 ```
+![manageagents](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/agent_control-l.png)
 
 If the same name appears twice (especially after moving a VM to a new IP), remove the old one:
 ```bash
@@ -230,6 +234,10 @@ sudo systemctl restart wazuh-manager
 ```
 
 ---
+
+
+![duplicate.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Windows-agent-log.png)
+
 
 ## Fixes
 
@@ -380,12 +388,14 @@ Splunk is not running.
 
 That's problem one.
 
-### Check 2 — Is the web port listening?
+### Check 2 — Is the web port listening? What error logs can we get
 
 On the Splunk VM:
 ```bash
 sudo ss -tlnp | grep 8000
+tail -n 20 /home/splunk/splunk/var/log/splunk/splunkd.log 
 ```
+![splunk.log](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/splunk-struggling-start-web.png)
 
 If you get nothing back, the web service isn't active.
 
