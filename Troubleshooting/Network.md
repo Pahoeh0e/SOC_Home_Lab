@@ -201,12 +201,14 @@ If you are on **WiFi only** and MacVTap does not work with your wireless card, c
 
 ## Symptoms
 
-- Cannot create new VMs: "unable to create swap volume" or "no space left on device"
+- Cannot create new VMs: "no space left on device"
 - `vgs` shows `VG pve` with very little or no free space (e.g., `8.88G` free on `71.50G` total)
 - `lvs` shows thin pool `data` at 100% full
 - Warning: "Sum of all thin volume sizes (80.00 GiB) exceeds size of thin pool"
 - Existing VMs crash or fail to write: pfSense shows `ZFS error 5`, `mounting from zfs:pfsense/root/default failed`
 - `qemu-img info` on the Proxmox VM disk file shows `virtual size: 272 GiB` but `disk size: 53 GiB` — the virtual disk is large but the filesystem inside hasn't been expanded
+
+[vgs screenshot](screenshots/vgs)
 
 ## Root Cause
 
