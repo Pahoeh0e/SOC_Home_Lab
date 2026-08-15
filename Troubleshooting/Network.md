@@ -23,7 +23,7 @@ Each guide follows the same structure:
 
 - pfSense console shows WAN IP as `192.168.122.x/24` instead of your home network (e.g., `192.168.1.x/24`)
 - Proxmox host also has IP `192.168.122.x` on `vmbr0`
-- Your laptop (on `192.168.1.x`) cannot ping or browse to the pfSense web UI
+- My PC (on `192.168.1.x`) cannot ping or browse to the pfSense web UI
 - pfSense installation may fail at package fetch (68/182) because it cannot reach the internet
 - From Proxmox, `ping 8.8.8.8` fails
 
@@ -36,7 +36,7 @@ Laptop (192.168.1.x)  --X-->  Proxmox (192.168.122.x)  -->  pfSense WAN (192.168
        Home LAN                    Libvirt NAT                     No internet
 ```
 
-pfSense gets its WAN IP from libvirt's internal DHCP server, not from your home router. Your laptop is on a completely different subnet with no route to `192.168.122.0/24`.
+pfSense gets its WAN IP from libvirt's internal DHCP server, not from your home router. My PC is on a completely different subnet with no route to `192.168.122.0/24`.
 
 ## Diagnosis
 
@@ -64,7 +64,7 @@ WAN (vtnet0) -> v4/DHCP4: 192.168.122.x/24
 
 **Should be:** `192.168.1.x/24` (or whatever your home router subnet is)
 
-### On Your Laptop
+### On my PC
 
 **Windows:**
 ```cmd
@@ -124,7 +124,7 @@ firefox https://192.168.122.x/
 # Replace 192.168.122.x with pfSense's actual WAN IP
 ```
 
-Or use an SSH tunnel to forward pfSense to your laptop:
+Or use an SSH tunnel to forward pfSense to my PC:
 
 ```bash
 # On Linux host
@@ -163,7 +163,7 @@ After applying Option 1 or 2:
    WAN (vtnet0) -> v4/DHCP4: 192.168.1.x/24
    ```
 
-3. From your laptop:
+3. From my PC:
    ```bash
    ping <pfSense-WAN-IP>
    ```
