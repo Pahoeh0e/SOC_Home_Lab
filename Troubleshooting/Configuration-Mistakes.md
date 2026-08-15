@@ -154,7 +154,7 @@ ping 8.8.8.8
 
 Both should succeed.
 
-## Prevention
+## Lessons Learnt
 
 | Decision | Recommendation |
 |----------|---------------|
