@@ -177,7 +177,7 @@ grep -A 2 "<server>" /var/ossec/etc/ossec.conf
 
 **On Windows (PowerShell):**
 ```powershell
-Get-Content "C:\Program Files (x86)\ossec-agent\ossec.conf" | Select-String -Pattern "<address>"
+Get-Content "C:\Program Files (x86)\ossec-agent\ossec.conf" tail -20
 ```
 
 ![Get-content.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ossec.log.png)
@@ -192,6 +192,7 @@ Make sure the IP matches your Wazuh Manager. I had mine pointing to an old subne
 ```bash
 nc -zv <MANAGER_IP> 1515
 nc -zv <MANAGER_IP> 1514
+ip route show
 ```
 
 **On Windows (PowerShell):**
@@ -223,13 +224,13 @@ sudo systemctl restart wazuh-manager
 
 **On the Wazuh Manager:**
 ```bash
-sudo /var/ossec/bin/manage_agents -l
+sudo /var/ossec/bin/agent_control -l
 ```
 ![manageagents](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/agent_control-l.png)
 
 If the same name appears twice (especially after moving a VM to a new IP), remove the old one:
 ```bash
-sudo /var/ossec/bin/manage_agents -r <AGENT_NAME>
+sudo /var/ossec/bin/manage_agents -R <AGENT_NUMBER>
 sudo systemctl restart wazuh-manager
 ```
 
