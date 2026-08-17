@@ -13,7 +13,7 @@ Each guide follows the same structure:
 
 ## Index:
 - [VM Network Bridge](#VM-Network-Bridge)
-- [Wazuh Agent Enrollment](#Wazuh-Agent-Enrollment-—-Windows-&-Linux)
+- [Wazuh Agent Enrollment](#Wazuh-Agent-Enrollment-for-Windows-&-Linux)
 - [Splunk Web UI not Accessbible](#Splunk-Web-UI-Not-Accessible)
 - [Splunk Dashboard Field Errors](#Splunk-Dashboard-Field-Errors)
 
@@ -125,7 +125,7 @@ Both should reply.
 
 
 
-# Wazuh Agent Enrollment — Windows & Linux
+# Wazuh Agent Enrollment for Windows & Linux
 
 **Category:** Wazuh / Agent Setup  
 **Lab Context:** Adding endpoints to Wazuh SIEM for monitoring  
