@@ -13,7 +13,7 @@ Each guide follows the same structure:
 
 ## Index:
 - [VM Network Bridge](#VM-Network-Bridge)
-- [Wazuh Agent Enrollment](#Wazuh-Agent-Enrollment—Windows-&-Linux)
+- [Wazuh Agent Enrollment](#Wazuh-Agent-Enrollment-—-Windows-&-Linux)
 - [Splunk Web UI not Accessbible](#Splunk-Web-UI-Not-Accessible)
 - [Splunk Dashboard Field Errors](#Splunk-Dashboard-Field-Errors)
 
