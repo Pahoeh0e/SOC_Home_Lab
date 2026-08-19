@@ -497,7 +497,7 @@ Some panels worked straight away, but others broke or stayed blank. I had to fig
 
 > `Error in 'EvalCommand': Type checking failed. The '>=' operator received different types.`
 
-![Type_error](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors13.png)
+![Type.error](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors13.png)
 
 **My thought process:** I thought `rule.level` was a number because it looks like one (e.g. `10`, `12`). But Splunk extracts it as a **string** (text). You can't do `>=` on text.
 
@@ -523,7 +523,7 @@ index=wazuh sourcetype=wazuh rule.id=100105
 
 **What I saw:** The *MITRE ATT&CK Coverage* panel showed a big `0`, even though my rules had MITRE tags.
 
-![MITRE1](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors3.png)
+![MITRE1.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors3.png)
 
 **My thought process:** I was searching for `rule.mitre.id`, but when I looked at the raw event fields, the actual name had curly braces on the end.
 
@@ -534,7 +534,7 @@ index=wazuh sourcetype=wazuh rule.id="100105"
 | table rule.mitre*
 ```
 
-![MITRE2](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors1.png)
+![MITRE2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors1.png)
 
 The field is called `rule.mitre.id{}` — those two characters `{}` matter because it's a **multivalue** field.
 
@@ -548,7 +548,7 @@ The field is called `rule.mitre.id{}` — those two characters `{}` matter becau
 
 I also checked `fieldsummary` to confirm the field existed, which showed the MITRE fields but with zero counts — that was a red herring because `fieldsummary` after `head 1` only sees one event.
 
-![MITRE_count](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors2.png)
+![MITRE.count](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors2.png)
 
 ---
 
@@ -556,7 +556,7 @@ I also checked `fieldsummary` to confirm the field existed, which showed the MIT
 
 **How I Figured It Out:** In the *Endpoint Alert* table, the `rule_id` column showed `Null` for every row, but `rule.description` was fine.
 
-![rule_id](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors11.png)
+![rule.id](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors11.png)
 
 **My thought process:** The dashboard XML or search was referencing a field name that didn't match what Splunk extracted. I needed to make sure `rule.id` was explicitly passed through to the table.
 
@@ -572,7 +572,7 @@ I also checked `fieldsummary` to confirm the field existed, which showed the MIT
 
 **What I saw:** The *Staging Server Activity* panel said "No results found" and the *Source IPs Hitting Staging Server* map was completely blank.
 
-![Empty_map](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors4.png)
+![Empty.map](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors4.png)
 
 **My thought process:** Two things were wrong here:
 1. I was using `win.eventdata.sourceIp` but that field didn't exist in these events.
@@ -587,7 +587,7 @@ index=wazuh sourcetype=wazuh rule.id=100105
 | table ip_1, ip_2, ip_3
 ```
 
-![Agent-IP](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors8.png)
+![Agent.IP](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors8.png)
 
 `agent.ip` (e.g. `10.0.0.101`) and `data.srcip` had values.
 
@@ -611,7 +611,7 @@ index=wazuh sourcetype=wazuh
 
 **What I saw:** The *Kill Chain Timeline* had a legend entry called `Unknown` instead of the actual kill-chain phases.
 
-![Timeline](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors12.png)
+![Timeline1](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors12.png)
 
 **My thought process:** The field I was using to split the chart series didn't exist or wasn't populated, so Splunk defaulted everything to `Unknown`.
 
@@ -628,7 +628,7 @@ index=wazuh sourcetype=wazuh
 
 After the fix, the timeline showed proper spikes with correct phase labels:
 
-![timeline](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors14.png)
+![timeline4](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors14.png)
 
 ---
 
