@@ -60,9 +60,9 @@ Proxmox lets you choose different network adapter types. I had picked **VirtIO**
 That was the giveaway. Windows knew a network card existed but had no driver for it.
 
 
-## Fixes
+## Fix
 
-### Fix 1 - VirtIO performs better, but you need to give Windows the driver manually.
+### VirtIO performs better, but you need to give Windows the driver manually.
 
 1. In Proxmox: **VM → Hardware → Add → CD/DVD Drive**
 2. Select `virtio-win.iso` from the ISO images list
@@ -75,21 +75,7 @@ That was the giveaway. Windows knew a network card existed but had no driver for
    - Click **OK** → **Next** → Install
 5. The adapter now shows as **Red Hat VirtIO Ethernet Adapter**
 
----
-
-## The Quick Fix - Change the adapter to Intel E1000.** No driver needed.
-
-1. **Shut down the Windows VM**
-2. In Proxmox: **VM → Hardware → Network Device → Edit**
-3. Change **Model** from `VirtIO` to **`Intel E1000`**
-4. Click **OK**
-5. **Start** the VM
-6. In Windows: `ipconfig` now shows the adapter and an IP address
-
-This took 30 seconds and fixed it immediately.
-
----
-
+![VirtIO](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-08-19%2009-12-10.png)
 
 ## How to Check It's Working
 
@@ -119,9 +105,8 @@ Both should reply.
 ## Lessons Learned
 
 - **If Windows has no network, check Device Manager first.** It tells you whether the OS even sees the hardware.
-- **VirtIO is great for Linux, but Windows needs help.** Use E1000 for Windows unless you have a reason not to.
+- **VirtIO is great for Linux and Windows, there is just a few extra steps** 
 - **The fix is usually the simple one.** I checked VLANs, bridges, and firewall rules before realising it was just a missing driver.
-- **For quick lab setups, E1000 + IDE is fine.** You can optimise later once everything is working.
 
 
 
@@ -138,7 +123,6 @@ Both should reply.
 I spent hours trying to get my Windows and Linux VMs to show up as active agents in the Wazuh Dashboard. They either:
 - Did not appear in the agent list at all
 - Showed up as **"Never connected"**
-- Got stuck in a loop of reinstalling the agent with no success
 
 I reinstalled the agent multiple times before realising the problem was not the install — it was the network path between the agent and the manager.
 
@@ -151,7 +135,7 @@ Getting an agent working is actually two separate steps:
 1. **Enrollment** — the agent gets a security key from the manager (port 1515)
 2. **Connection** — the agent starts sending data to the manager (port 1514)
 
-Both need to work. I kept fixing one and forgetting the other.
+Both need to work. I kept fixing one and not the other.
 
 ---
 
@@ -172,8 +156,9 @@ Both need to work. I kept fixing one and forgetting the other.
 
 **On Linux:**
 ```bash
-grep -A 2 "<server>" /var/ossec/etc/ossec.conf
+nano /var/ossec/etc/ossec.conf
 ```
+![ossec.conf](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/checking_ossec-conf.png)
 
 **On Windows (PowerShell):**
 ```powershell
@@ -212,6 +197,7 @@ If either test fails, a firewall is blocking the path. In my lab, pfSense was dr
 ```bash
 sudo ss -tlnp | grep -E "1514|1515"
 ```
+![sudoss](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-08-19%2009-06-22.png)
 
 You should see both ports listed. If 1515 is missing, the auth service is not running. Restart the manager:
 ```bash
@@ -265,6 +251,8 @@ Restart-Service -Name WazuhSvc
 
 In my lab, the agent and manager were on different VLANs. I had to add a rule in pfSense to allow traffic between them.
 
+[NoLantoMGMT](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/pfsense_no_Lan_to_MGMT.png)
+
 **What I added in pfSense:**
 - Interface: LAN (where the agent lives)
 - Source: LAN subnets
@@ -272,31 +260,9 @@ In my lab, the agent and manager were on different VLANs. I had to add a rule in
 - Protocol: Any
 - Ports: 1514 and 1515
 
-I also learned that pfSense is **stateful** — you only need to allow the outbound path. Return traffic is handled automatically. I had added an inbound rule on the MGMT side that was unnecessary.
+I also learned that pfSense is **stateful** — you only need to allow the outbound path. Return traffic is handled automatically.
 
----
-
-### Fix 3 — Remove stale agents and re-enrol
-
-**On the manager:**
-```bash
-sudo /var/ossec/bin/manage_agents -r <AGENT_NAME>
-sudo systemctl restart wazuh-manager
-```
-
-**On Linux:**
-```bash
-sudo systemctl restart wazuh-agent
-sudo tail -f /var/ossec/logs/ossec.log
-```
-
-**On Windows:**
-```powershell
-Restart-Service -Name WazuhSvc
-Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 20
-```
-
-Watch for `Connected to the server` in the log.
+![LantoMGMT](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/pfsense_allow_lan_to_MGMT.png)
 
 ---
 
