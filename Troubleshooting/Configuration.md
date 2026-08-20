@@ -302,6 +302,9 @@ Restart-Service -Name WazuhSvc
 | Log confirms | Agent VM | `Connected to the server` in ossec.log |
 | Ports open | Manager | `ss -tlnp` shows 1514 and 1515 listening |
 
+![wazuhdashboard.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-08-20%2010-52-53.png)
+
+
 ---
 
 ## Lessons Learned
@@ -362,7 +365,7 @@ On the Splunk VM:
 sudo ss -tlnp | grep 8000
 tail -n 20 /home/splunk/splunk/var/log/splunk/splunkd.log 
 ```
-![splunk.log](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/splunk-struggling-start-web.png)
+![splunk.log.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/splunk-struggling-start-web.png)
 
 If you get nothing back, the web service isn't active.
 
@@ -497,7 +500,7 @@ Some panels worked straight away, but others broke or stayed blank. I had to fig
 
 > `Error in 'EvalCommand': Type checking failed. The '>=' operator received different types.`
 
-![Type.error](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors13.png)
+![Typeerror.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors13.png)
 
 **My thought process:** I thought `rule.level` was a number because it looks like one (e.g. `10`, `12`). But Splunk extracts it as a **string** (text). You can't do `>=` on text.
 
@@ -548,7 +551,7 @@ The field is called `rule.mitre.id{}` — those two characters `{}` matter becau
 
 I also checked `fieldsummary` to confirm the field existed, which showed the MITRE fields but with zero counts — that was a red herring because `fieldsummary` after `head 1` only sees one event.
 
-![MITRE.count](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors2.png)
+![MITRE.count.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors2.png)
 
 ---
 
@@ -556,7 +559,7 @@ I also checked `fieldsummary` to confirm the field existed, which showed the MIT
 
 **How I Figured It Out:** In the *Endpoint Alert* table, the `rule_id` column showed `Null` for every row, but `rule.description` was fine.
 
-![rule.id](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors11.png)
+![rule.id.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors11.png)
 
 **My thought process:** The dashboard XML or search was referencing a field name that didn't match what Splunk extracted. I needed to make sure `rule.id` was explicitly passed through to the table.
 
@@ -572,7 +575,7 @@ I also checked `fieldsummary` to confirm the field existed, which showed the MIT
 
 **What I saw:** The *Staging Server Activity* panel said "No results found" and the *Source IPs Hitting Staging Server* map was completely blank.
 
-![Empty.map](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors4.png)
+![Empty.map.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors4.png)
 
 **My thought process:** Two things were wrong here:
 1. I was using `win.eventdata.sourceIp` but that field didn't exist in these events.
@@ -587,7 +590,7 @@ index=wazuh sourcetype=wazuh rule.id=100105
 | table ip_1, ip_2, ip_3
 ```
 
-![Agent.IP](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors8.png)
+![Agent.IP.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors8.png)
 
 `agent.ip` (e.g. `10.0.0.101`) and `data.srcip` had values.
 
@@ -598,7 +601,7 @@ index=wazuh sourcetype=wazuh
 | sort rule.id
 ```
 
-![rule.id2](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors6.png)
+![rule.id2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors6.png)
 
 **The fix:** Use `coalesce()` to try multiple IP fields, and update the `rule.id` filter:
 ```spl
@@ -611,7 +614,7 @@ index=wazuh sourcetype=wazuh
 
 **What I saw:** The *Kill Chain Timeline* had a legend entry called `Unknown` instead of the actual kill-chain phases.
 
-![Timeline1](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors12.png)
+![Timeline1.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors12.png)
 
 **My thought process:** The field I was using to split the chart series didn't exist or wasn't populated, so Splunk defaulted everything to `Unknown`.
 
@@ -628,7 +631,7 @@ index=wazuh sourcetype=wazuh
 
 After the fix, the timeline showed proper spikes with correct phase labels:
 
-![timeline4](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors14.png)
+![timeline4.png](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Screenshots/Splunk-Dashboard-Errors14.png)
 
 ---
 
