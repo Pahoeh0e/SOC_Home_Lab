@@ -106,6 +106,8 @@ Production-like SOC environment demonstrating:
 
 ## Detection Capabilities
 
+As well as [SOC fortress](https://github.com/socfortress/Wazuh-Rules) rules for Wazuh I created some of my own to learn how to create and test them.
+
 | ID | Detection | MITRE Technique | Data Source | Severity | 
 |----|-----------|----------------|-------------|----------|
 | **DET-001** | Port Scan Detection | [T1046](https://attack.mitre.org/techniques/T1046/) | Snort / pfSense | Medium |
