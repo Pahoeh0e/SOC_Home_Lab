@@ -1,6 +1,6 @@
 # Network Troubleshooting 
 
-See [Network Architecture](ARCHITECTURE.md) for the full architecture 
+See [Network Architecture](Architecture.md) for the full architecture 
 
 ## Format
 
