@@ -148,8 +148,8 @@ See [Operations](Operations) for full red team procedures with commands and scre
 
 | File | Description |
 |------|-------------|
-| [ARCHITECTURE.md](Architecture.md) | Proxmox topology, VLAN config, pfSense rules, VM specs |
-| [DETECTION-RULES.md](DETECTION-RULES.md) | SPL queries, Wazuh rules, Snort rules, MITRE mappings |
+| [Architecture.md](Architecture.md) | Proxmox topology, VLAN config, pfSense rules, VM specs |
+| [Custom-Detection-Rules.md](Custom-Dection-Rules.md) | SPL queries, Wazuh rules, Snort rules, MITRE mappings |
 | [Operations.md](Operations) | Step-by-step attack procedures with expected detections |
 | [Troubleshooting.md](Troubleshooting.md) | Walk-through of troubleshooting log and lessons learnt |
 
