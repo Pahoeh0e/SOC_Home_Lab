@@ -48,8 +48,6 @@ index=snort OR index=firewall earliest=-5m
 
 ```
 
-Testing (INSERT EVIDENCE)
-
 
 ## DET-002: Brute Force Authentication
 
@@ -97,8 +95,6 @@ index=winsec EventCode=4625 earliest=-15m
 </group>
 
 ```
-
-Testing (INSERT EVIDENCE)
 
 ## DET-003: Suspicious PowerShell Execution
 
@@ -155,8 +151,6 @@ index=sysmon EventCode=1 earliest=-1h
   </rule>
 </group>
 ```
-
-Testing (INSERT EVIDENCE)
 
 
 ## DET-004: Lateral Movement (PsExec)
@@ -221,7 +215,6 @@ index=winsec EventCode=7045 ServiceName="PSEXESVC"
 </group>
 
 ```
-Testing (INSERT EVIDENCE)
 
 ## DET-005: C2 Beaconing Detection
 
@@ -281,7 +274,6 @@ index=sysmon EventCode=3 earliest=-4h
   </rule>
 </group>
 ```
-Testing (INSERT EVIDENCE)
 
 ## DET-006: Credential Dumping (Mimikatz)
 
@@ -342,7 +334,6 @@ index=sysmon EventCode=7 ImageLoaded="*\\samlib.dll"
   </rule>
 </group>
 ```
-Testing (INSERT EVIDENCE)
 
 ## DET-007: Persistence via Registry Run Keys
 ### MITRE Mapping
@@ -399,8 +390,6 @@ index=sysmon EventCode=13 earliest=-1h
 </group>
 ```
 
-Testing (INSERT EVIDENCE)
-
 ## DET-008: Data Exfiltration
 ### MITRE Mapping
 - **Technique**: T1041 — Exfiltration Over C2 Channel
@@ -445,4 +434,59 @@ index=firewall earliest=-1h
 </group>
 
 ```
-Testing (INSERT EVIDENCE)
+## DET-008: Detect Web Server User Spawning a Shell
+### MITRE Mapping
+- **Technique**: T1059 & T1505.003 - Command execution and web server process executing shell commands indicates a possible web shell
+- **Tactic**: Execution & Persistence
+
+### Wazuh Rule 
+```
+
+<group name="web_shell_detection,">
+  <rule id="100500" level="12">
+    <if_sid>80700</if_sid>
+    <field name="audit.auid" type="pcre2">33|www-data|apache|nginx</field>
+    <field name="audit.exe" type="pcre2">/bin/bash|/bin/sh|/usr/bin/bash|/usr/bin/sh</field>
+    <description>Web server user spawned a shell - possible reverse shell or web shell</description>
+    <mitre>
+      <id>T1059</id>
+      <id>T1505.003</id>
+    </mitre>
+    <group>audit,web_shell_detection,</group>
+  </rule>
+</group>
+
+```
+
+### Snort Rule (DMZ Sensor)
+```
+
+alert tcp $HOME_NET [80,443,8080] -> $EXTERNAL_NET any (
+    msg:"SOC-LAB Web Server Reverse Shell Detected";
+    flow:established,to_client;
+    content:"|0d 0a|"; depth:2;
+    detection_filter:track by_src, count 4, seconds 30;
+    reference:url,https://attack.mitre.org/techniques/T1059/;
+    classtype:trojan-activity;
+    sid:1000002;
+    rev:1;
+)
+
+```
+
+### Splunk SPL 
+
+```
+
+index=os OR index=linux_audit earliest=-5m
+| search user="www-data" OR user="apache" OR user="nginx"
+| stats count as shell_spawns by host, user, process
+| where match(process, "(bash|sh)$")
+| eval severity="Critical"
+| eval mitre_technique="T1059"
+| eval mitre_subtechnique="T1505.003"
+| table _time, host, user, process, shell_spawns, severity, mitre_technique, mitre_subtechnique
+| sort - shell_spawns
+
+```
+
