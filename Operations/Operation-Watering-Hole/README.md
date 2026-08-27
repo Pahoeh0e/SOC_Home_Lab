@@ -1,6 +1,6 @@
 ## Operation Watering Hole: End-to-End Detection Engineering
 
-# *Write-up Pending*
+# *Write-up Pending* :warning:   
 
 ## Threat Scenario
 
