@@ -165,4 +165,4 @@ See [Operations](Operations) for full red and blue team procedures with commands
 
 ---
 
-**Last Updated**: July 2026
+**Last Updated**: August 2026
