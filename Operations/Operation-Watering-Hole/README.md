@@ -1,6 +1,6 @@
-:warning:
+# :warning:
 # *Write-up Pending* 
-:warning:   
+# :warning:   
 
 
 ## Operation Watering Hole: End-to-End Detection Engineering
