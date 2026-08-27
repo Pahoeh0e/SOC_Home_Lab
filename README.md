@@ -129,7 +129,7 @@ As well as [SOC fortress](https://github.com/socfortress/Wazuh-Rules) rules for 
 
 ## Operations
 
-See [Operations](Operations) for full red team procedures with commands and screenshots.
+See [Operations](Operations) for full red and blue team procedures with commands and detection rules.
 
 | Step | Action | Detection |
 |------|--------|-----------|
