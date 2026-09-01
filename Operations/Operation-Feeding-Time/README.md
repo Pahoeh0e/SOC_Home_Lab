@@ -70,6 +70,8 @@ that mirror real-world APT behavior:
 
 ## Detection Coverage
 
+For all custom rules view the [Custom-Detection-Rules](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Custom-Detection-Rules.md) section.
+
 ### Immediate Detection (Execution Phase)
 **Wazuh Rule 100005** (PowerShell suspicious parameters) fires immediately 
 upon script execution, detecting:
