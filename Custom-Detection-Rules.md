@@ -490,3 +490,44 @@ index=os OR index=linux_audit earliest=-5m
 
 ```
 
+## DET-009: Detect Reverse Shell Network Callback
+### MITRE Mapping
+- **Technique**: T1059 & T1071 — Shell execution with network callback indicates command and control communication
+- **Tactic**: Execution & Command and Control
+
+Wazuh Rule
+``` xml
+<group name="web_shell_detection,">
+  <rule id="100601" level="14">
+    <if_sid>100600</if_sid>
+    <field name="audit.command" type="pcre2">/dev/tcp|nc|netcat|curl|wget</field>
+    <description>Web server user spawned shell with network callback - likely reverse shell</description>
+    <mitre>
+      <id>T1059</id>
+      <id>T1071</id>
+    </mitre>
+    <group>audit,web_shell_detection,correlation,</group>
+  </rule>
+</group>
+```
+
+## DET-010: Detect SSH Key Persistence
+### MITRE Mapping
+- **Technique**: T1098.004 & T1021.004 — SSH authorized_keys modification indicates account manipulation and remote service access for persistence
+- **Tactic**: Persistence & Lateral Movement
+
+Wazuh Rule
+``` xml
+<group name="ssh_persistence,">
+  <rule id="100602" level="14">
+    <if_sid>550</if_sid>
+    <field name="file" type="pcre2">authorized_keys$</field>
+    <description>authorized_keys file modified - SSH backdoor likely planted</description>
+    <mitre>
+      <id>T1098.004</id>
+      <id>T1021.004</id>
+    </mitre>
+    <group>syscheck,ssh_persistence,persistence,</group>
+  </rule>
+</group>
+```
