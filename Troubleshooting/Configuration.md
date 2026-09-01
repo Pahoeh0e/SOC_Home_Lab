@@ -658,3 +658,100 @@ After the fix, the timeline showed proper spikes with correct phase labels:
 5. **Update your filters when you add new rules.** If `rule.id IN (...)` is stale, new alerts just vanish.
 6. **`Null` in a table usually means a field name mismatch.** Splunk won't error — it'll just show `Null`.
 
+
+# Docker Container for simulated attack
+
+> **Lab:** Home SOC Lab (Proxmox)  
+> **Tools:** Wazuh, Docker, Apache   
+> **Goal:** Create a Damn Vulnerable Web Application that can be exploited to gain root privilege
+
+---
+
+## What I Was Trying to Do
+
+Setup a docker that was purposefully vulnerable so the attacker could gain access to the host and eventually gain root privilege to the /.ssh file on the host to edit and create an ssh persistence mechanism.
+
+---
+
+## Problem 1: SQL DATABASE syntax issues
+
+**What I saw:** I saw multiple error messages for the MySql command to add the dvwa user:
+
+![syntaxerrorsql.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/MySql-error-spelling.png)
+
+**My thought process:** I tried a few commands I looked up online about alternative phasing of the MySql command, thinking I had the wrong version
+
+**The fix:** Change the syntax. There is a misspelling of the word 'IDENTIFIED'.
+
+![correctSQL.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/correct-SQL-create-dvwa.png)
+
+---
+
+Problem 2: Docker not allowing root access from command injection simulated attack
+
+**What I saw :** Reverse shell obtained, but `.ssh` directory and `authorized_keys` modifications are not visible on the host. SSH login attempts fail with "No such user" or permission denied.
+
+![dockernovictimroot.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/realising-docker-no-victim-user.png)
+
+**My thought process:** Docker containers run with isolated filesystem namespaces. Users created or files written inside a container exist only within that container's overlay filesystem. The host's `sshd` reads `/etc/passwd` and home directories from the host filesystem, not the container.
+
+
+**Resolution:** Run DVWA directly on an Apache2 server rather than in a Docker container:
+
+```bash
+# Stop and remove containerised DVWA
+docker stop dvwa
+docker rm dvwa
+
+# Install Apache and PHP on host
+apt install -y apache2 php libapache2-mod-php
+
+# Deploy DVWA to host web root
+cd /var/www/html
+git clone https://github.com/digininja/DVWA.git dvwa
+
+# Permissions
+
+chown -R www-data:www-data /var/www/html/dvwa
+chown 755 /var/www/html/dvwa
+systemctl restart apache2
+
+```
+
+![startapache2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/dvwa-starting-apache2.png)
+
+---
+
+Problem 3: Apache2 website error 500 
+
+**What I saw :** The DVWA website could be accessed but then after logging in it hit a 500 error
+
+![500siteerror.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-01%2018-36-29.png)
+
+
+**My thought process:** Check the Apache error logs to see what the most recent issue had been. It showed that this was a DVWA compatibility issue with MySQL 8.0. The setup script was using an old SQL syntax:
+``` bash
+
+tail -20 /var/log/apache2/error.log
+``` 
+
+![apachelogerror.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/dvwa-Apache2-error1.png)
+
+**The Fix**: I could have downloaded a more compatable version of DVWA, however to understand Apache2 more I chose to patch the php file:
+
+``` bash
+
+nano /var/www/html/dvwa/dvwa/includes/DBMS/MySQL.php
+# Change 
+IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'
+# to
+role VARCHAR(20) DEFAULT 'user'
+```
+
+![phpeditapache.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Apache2-php-edit.png)
+
+## **Lessons Learnt**:
+
+1. **Container isolation (initial Docker deployment) blocked persistence** — files written inside the container were invisible to the host SSH daemon
+2. **Host-based Apache allowed full filesystem access post-exploitation**
+
