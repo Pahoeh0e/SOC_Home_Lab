@@ -16,6 +16,7 @@ Each guide follows the same structure:
 - [Wazuh Agent Enrollment](#Wazuh-Agent-Enrollment-for-Windows-&-Linux)
 - [Splunk Web UI not Accessbible](#Splunk-Web-UI-Not-Accessible)
 - [Splunk Dashboard Field Errors](#Splunk-Dashboard-Field-Errors)
+- [Setting up DVWA web for simulated attack](#Setting-up-DVWA-web-for-simulated-attack)
 
 
 
@@ -659,7 +660,7 @@ After the fix, the timeline showed proper spikes with correct phase labels:
 6. **`Null` in a table usually means a field name mismatch.** Splunk won't error — it'll just show `Null`.
 
 
-# Docker Container for simulated attack
+# Setting up DVWA web for simulated attack
 
 > **Lab:** Home SOC Lab (Proxmox)  
 > **Tools:** Wazuh, Docker, Apache   
@@ -749,6 +750,8 @@ role VARCHAR(20) DEFAULT 'user'
 ```
 
 ![phpeditapache.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Apache2-php-edit.png)
+
+
 
 ## **Lessons Learnt**:
 
