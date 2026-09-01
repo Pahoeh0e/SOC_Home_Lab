@@ -1,6 +1,6 @@
 ## Operation Watering Hole: End-to-End Detection Engineering
 
-A simulated attack chain demonstrating Linux endpoint detection via Wazuh FIM and auditd, mapped to MITRE ATT&CK.
+A simulated attack chain demonstrating Linux endpoint detection via Wazuh FIM and auditd, mapped to MITRE ATT&CK. This was inspired by the THM Hacker Holidays CTFs which I then wanted to replicate and refine to my lab.
 
 ## Threat Scenario
 
