@@ -69,7 +69,7 @@ cd /root
 
 ```
 
-([catpasswd.png]https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/www-data-cat-etc-passwd.png)
+![catpasswd.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/www-data-cat-etc-passwd.png)
 
 
 ### Exploiting misconfiguration
@@ -109,3 +109,85 @@ ssh -i ~/.ssh/pivot_key root@10.0.0.103
 ```
 
 
+
+## Detection Coverage
+
+### Wazuh Configuration
+
+#### Step 1: Enable FIM for .ssh Directories
+Edit /var/ossec/etc/ossec.conf on the Wazuh agent:
+``` xml
+<syscheck>
+  <directories check_all="yes" report_changes="yes" tags="ssh_keys">/home/*/.ssh</directories>
+  <directories check_all="yes" report_changes="yes" tags="ssh_keys">/root/.ssh</directories>
+  <frequency>300</frequency>
+</syscheck>
+```
+![ossecssh.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-01%2012-46-39.png)
+
+#### Step 2: Add the Apache2 logs to the Wazuh Agent
+Edit /var/ossec/etc/ossec.conf on the Wazuh agent:
+``` xml
+<localfile>
+  <log_format>apache</log_format>
+  <location>/var/log/apache2/error.log</location>
+</localfile>
+<localfile>
+  <log_format>apache</log_format>
+  <location>/var/log/apache2/access.log</location>
+</localfile>
+```
+
+![ossecapache](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-01%2012-49-57.png)
+
+Restart the agent:
+``` bash
+systemctl restart wazuh-agent
+```
+
+#### Step 3: Add Custom Rules
+
+For all custom rules view the [Custom-Detection-Rules](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Custom-Detection-Rules.md) section.
+
+
+Add these to /var/ossec/etc/rules/local_rules.xml on the Wazuh manager:
+
+### Immediate Detection (Execution Phase)
+**Wazuh Rule 100600** (Web server user spawned shell) fires immediately upon reverse shell execution, detecting:
+- executing `/bin/bash` by www-data
+- Apache-owned process spawning interactive shell
+
+**Alert Level:** 12  
+**Event:** Sysmon 1   
+**MITRE:** T1059, T1505.003
+---
+
+### Network Callback Detection
+**Wazuh Rule 100601** (Reverse shell callback) fires when the spawned shell includes network redirection patterns, detecting:
+- `/dev/tcp/ bash` pseudo-device usage
+- `nc, curl, wget` in command context
+
+**Alert Level:** 14
+**Event:** Sysmon 1
+**MITRE:** T1059, T1071
+
+
+### Persistence Detection
+**Wazuh Rule 100602** (SSH key persistence) fires when authorized_keys is modified via FIM, detecting:
+- New public key appended to authorized_keys
+- .ssh directory permission changes
+
+
+**Alert Level:** 14 
+**Event:** syscheck (FIM) 
+**MITRE:** T1098.004, T1021.004
+
+
+## Kill Chain Timeline
+
+| Time | MITRE ID | Phase | Detection |
+|------|----------|-------|-----------|
+
+| T+0s   │ 100600 │ Execution      │ www-data spawns bash |
+| T+0s   │ 100601 │ Execution      │ /dev/tcp callback detected |
+| T+30s  │ 100602 │ Persistence    │ /root/.ssh/authorized_keys modified |
