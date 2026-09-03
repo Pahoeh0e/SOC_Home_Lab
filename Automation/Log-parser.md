@@ -54,7 +54,7 @@ def severity_label(level):
 
 
 def main():
-    # Allow custom filepath via command line
+# Allow custom filepath via command line
     filepath = sys.argv[1] if len(sys.argv) > 1 else "/var/ossec/logs/alerts/alerts.json"
     
 # Allow custom severity threshold
