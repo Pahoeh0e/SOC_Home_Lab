@@ -3,4 +3,4 @@
 
 Contents:
 
-- [Log Parser](/Log-Parser.md)
+- [Log Parser](Automation/Log-parser.md)
