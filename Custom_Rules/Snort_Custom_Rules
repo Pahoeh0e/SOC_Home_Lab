@@ -1,0 +1,180 @@
+# Snort (DMZ sensor) Detection Rules
+
+All rules map to MITRE ATT&CK and include testing procedures.
+
+---
+
+## DET-001: Port Scan Detection
+
+### MITRE Mapping
+- **Technique**: T1046 — Network Service Scanning
+- **Tactic**: Reconnaissance
+
+```snort
+alert tcp any any -&gt; $HOME_NET any (
+    msg:"SOC-LAB Port Scan Detected"; 
+    flags:S; 
+    threshold:type both, track by_src, count 20, seconds 10; 
+    sid:1000001; 
+    rev:1;
+)
+
+```
+
+
+## DET-002: Brute Force Authentication
+
+### MITRE Mapping
+- **Technique**: T1110 — Brute Force
+- **Sub-technique**: T1110.001 — Local Brute Force
+- **Tactic**: Initial Access
+
+
+```
+alert tcp any any -> $HOME_NET 3389 (
+    msg:"SOC-LAB RDP Brute Force Detected";
+    flow:established,to_server;
+    content:"|03 00|"; depth:2;
+    detection_filter:track by_src, count 5, seconds 60;
+    sid:1000002;
+    rev:1;
+)
+```
+
+
+## DET-003: Suspicious PowerShell Execution
+
+### MITRE Mapping
+- **Technique**: T1059.001 — PowerShell
+- **Tactic**: Execution
+
+```
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"SOC-LAB Suspicious Outbound PowerShell/C2 Traffic";
+    flow:established,to_server;
+    content:"powershell"; http_header; nocase;
+    sid:1000003;
+    rev:1;
+)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"SOC-LAB Encoded Command in HTTP POST";
+    flow:established,to_server;
+    content:"POST"; http_method;
+    content:"-enc"; http_client_body; nocase;
+    sid:1000004;
+    rev:1;
+)
+```
+
+
+## DET-004: Lateral Movement (PsExec)
+
+### MITRE Mapping
+- **Technique**: T1021.002 — Remote Services: SMB/Windows Admin Shares
+- **Tactic**: Lateral Movement
+
+```
+alert tcp $HOME_NET any -> $HOME_NET 445 (
+    msg:"SOC-LAB PsExec Service File Transfer Detected";
+    flow:established,to_server;
+    content:"|5c|psexesvc.exe"; nocase;
+    sid:1000005;
+    rev:1;
+)
+
+alert tcp $HOME_NET any -> $HOME_NET 445 (
+    msg:"SOC-LAB SMB Admin Share Access (Possible Lateral Movement)";
+    flow:established,to_server;
+    content:"|00 00 00 9f ff 53 4d 42|"; depth:9;
+    content:"|5c|ADMIN$|5c|"; nocase;
+    sid:1000006;
+    rev:1;
+)
+```
+
+## DET-005: C2 Beaconing Detection
+
+### MITRE Mapping
+- **Technique**: T1071 — Application Layer Protocol
+- **Tactic**: Command and Control
+
+```
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"SOC-LAB C2 Beaconing Detected - Regular Intervals";
+    flow:established,to_server;
+    detection_filter:track by_src, count 10, seconds 300;
+    sid:1000007;
+    rev:1;
+)
+```
+
+
+## DET-006: Credential Dumping (Mimikatz)
+
+### MITRE Mapping
+- **Technique**: T1003 — OS Credential Dumping
+- **Tactic**: Credential Access
+
+```
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"SOC-LAB Mimikatz Output Upload Detected";
+    flow:established,to_server;
+    content:"sekurlsa"; nocase;
+    sid:1000009;
+    rev:1;
+)
+
+```
+
+## DET-007: Persistence via Registry Run Keys
+### MITRE Mapping
+- **Technique**: T1547.001 — Registry Run Keys / Startup Folder
+- **Tactic**: Persistence
+
+```
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"SOC-LAB Registry Run Key Config Exfil";
+    flow:established,to_server;
+    content:"Software|5c|Microsoft|5c|Windows|5c|CurrentVersion|5c|Run"; nocase;
+    sid:1000010;
+    rev:1;
+)
+```
+
+
+## DET-008: Data Exfiltration
+### MITRE Mapping
+- **Technique**: T1041 — Exfiltration Over C2 Channel
+- **Tactic**: Exfiltration
+
+```
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"SOC-LAB Large Data Transfer - Possible Exfiltration";
+    flow:established,to_server;
+    content:!"GET"; content:!"POST"; 
+    detection_filter:track by_src, count 1000, seconds 60;
+    sid:1000008; 
+    rev:1;
+)
+```
+
+## DET-008: Detect Web Server User Spawning a Shell
+### MITRE Mapping
+- **Technique**: T1059 & T1505.003 - Command execution and web server process executing shell commands indicates a possible web shell
+- **Tactic**: Execution & Persistence
+
+```
+
+alert tcp $HOME_NET [80,443,8080] -> $EXTERNAL_NET any (
+    msg:"SOC-LAB Web Server Reverse Shell Detected";
+    flow:established,to_client;
+    content:"|0d 0a|"; depth:2;
+    detection_filter:track by_src, count 4, seconds 30;
+    reference:url,https://attack.mitre.org/techniques/T1059/;
+    classtype:trojan-activity;
+    sid:1000002;
+    rev:1;
+)
+
+```
