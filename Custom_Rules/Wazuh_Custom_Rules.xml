@@ -1,0 +1,275 @@
+<!--
+  SOC-LAB Custom Detection Rules
+-->
+
+<!-- ============================================================
+     DET-001: Port Scan Detection
+     MITRE: T1046 — Network Service Scanning (Reconnaissance)
+     ============================================================ -->
+<group name="det001_portscan,reconnaissance,">
+  <rule id="100001" level="10" frequency="20" timeframe="10">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip />
+    <description>Multiple connection attempts from $(srcip) - possible port scan</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-002: Brute Force Authentication (RDP)
+     MITRE: T1110 — Brute Force / T1110.001
+     ============================================================ -->
+<group name="det002_bruteforce,authentication,">
+  <rule id="100002" level="12" frequency="5" timeframe="300">
+    <if_matched_sid>60122</if_matched_sid>
+    <same_source_ip />
+    <description>Multiple failed RDP logins from $(srcip) - possible brute force attack</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-003: Suspicious PowerShell Execution
+     MITRE: T1059.001 — PowerShell (Execution)
+     ============================================================ -->
+<group name="det003_powershell,suspicious_execution,">
+  <rule id="100003" level="13">
+    <if_sid>92010</if_sid>
+    <field name="win.eventdata.CommandLine">(?i)(-enc\s|-encodedcommand\s|iex\s|invoke-expression|downloadstring|bitsadmin|frombase64string)</field>
+    <description>Suspicious PowerShell execution detected on $(win.system.computer)</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-004: Lateral Movement (PsExec / Admin Shares)
+     MITRE: T1021.002 — Remote Services: SMB/Windows Admin Shares
+     ============================================================ -->
+<group name="det004_lateral_movement,psexec,admin_shares,">
+  <rule id="100004" level="12">
+    <if_sid>92010</if_sid>
+    <field name="win.eventdata.Image">(?i)psexec\.exe|psexesvc\.exe</field>
+    <description>PsExec execution detected - possible lateral movement on $(win.system.computer)</description>
+    <mitre>
+      <id>T1021.002</id>
+    </mitre>
+  </rule>
+
+  <rule id="100041" level="12">
+    <if_sid>92010</if_sid>
+    <field name="win.eventdata.CommandLine">(?i)\\\\[^\s]+\\(admin|ipc|c|d)\$</field>
+    <description>Admin share access detected - possible lateral movement on $(win.system.computer)</description>
+    <mitre>
+      <id>T1021.002</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-005: C2 Beaconing Detection
+     MITRE: T1071 — Application Layer Protocol (C2)
+     ============================================================ -->
+<group name="det005_c2,beaconing,command_and_control,">
+  <rule id="100005" level="12" frequency="10" timeframe="300">
+    <if_matched_sid>92003</if_matched_sid>
+    <same_source_ip />
+    <same_field>win.eventdata.Image</same_field>
+    <description>Repeated outbound connections from same process on $(win.system.computer) - possible C2 beaconing</description>
+    <mitre>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+
+  <rule id="100051" level="13">
+    <if_sid>92010</if_sid>
+    <field name="win.eventdata.Image">(?i)(beacon|agent|implant|shell|reverse|meterpreter)\.(exe|dll|ps1|bat)</field>
+    <description>Possible C2 agent execution detected on $(win.system.computer)</description>
+    <mitre>
+      <id>T1071</id>
+      <id>T1059</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-006: Credential Dumping (LSASS / Mimikatz)
+     MITRE: T1003 — OS Credential Dumping / T1003.001
+     ============================================================ -->
+<group name="det006_credential_access,lsass,mimikatz,">
+  <rule id="100006" level="14">
+    <if_sid>92010</if_sid>
+    <field name="win.eventdata.TargetImage">(?i)lsass\.exe</field>
+    <field name="win.eventdata.GrantedAccess">(?i)0x1010|0x1410|0x143a|0x1438|0x1016</field>
+    <description>LSASS access with suspicious permissions on $(win.system.computer) - possible credential dumping</description>
+    <mitre>
+      <id>T1003.001</id>
+    </mitre>
+  </rule>
+
+  <rule id="100061" level="14">
+    <if_sid>92010</if_sid>
+    <field name="win.eventdata.Image">(?i)mimikatz|mimilib|mimidrv|kiwi</field>
+    <description>Mimikatz tool execution detected on $(win.system.computer)</description>
+    <mitre>
+      <id>T1003</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-007: Persistence via Registry Run Keys
+     MITRE: T1547.001 — Registry Run Keys / Startup Folder
+     ============================================================ -->
+<group name="det007_persistence,registry_run_keys,">
+  <rule id="100007" level="10">
+    <if_sid>92013</if_sid>
+    <field name="win.eventdata.EventType">SetValue</field>
+    <field name="win.eventdata.TargetObject">(?i)\\Software\\Microsoft\\Windows\\CurrentVersion\\Run</field>
+    <description>Registry Run key modified on $(win.system.computer) - possible persistence</description>
+    <mitre>
+      <id>T1547.001</id>
+    </mitre>
+  </rule>
+
+  <rule id="100071" level="10">
+    <if_sid>92013</if_sid>
+    <field name="win.eventdata.EventType">SetValue</field>
+    <field name="win.eventdata.TargetObject">(?i)\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce</field>
+    <description>Registry RunOnce key modified on $(win.system.computer) - possible persistence</description>
+    <mitre>
+      <id>T1547.001</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-008: Data Exfiltration
+     MITRE: T1041 — Exfiltration Over C2 Channel
+     ============================================================ -->
+<group name="det008_exfiltration,">
+  <rule id="100008" level="12" frequency="50" timeframe="60">
+    <if_matched_sid>92003</if_matched_sid>
+    <same_source_ip />
+    <field name="win.eventdata.DestinationIp">^(?!10\.0\.)</field>
+    <description>Large volume of outbound connections to external IP from $(win.system.computer) - possible data exfiltration</description>
+    <mitre>
+      <id>T1041</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-009: Web Server User Spawning a Shell
+     MITRE: T1059 & T1505.003 — Execution / Web Shell
+
+     FIXED: this rule was originally ID 100500, but DET-010 below
+     references if_sid 100600 expecting THIS rule to be the parent.
+     Renumbered to 100600 so the correlation actually works.
+     Also gave it its own group name (was duplicated with DET-010's
+     group name "web_shell_detection" in the original, which is
+     fine to share intentionally, but keeping distinct group tags
+     per rule set makes each one easier to enable/disable later).
+     ============================================================ -->
+<group name="det009_web_shell_detection,">
+  <rule id="100600" level="12">
+    <if_sid>80700</if_sid>
+    <field name="audit.auid" type="pcre2">33|www-data|apache|nginx</field>
+    <field name="audit.exe" type="pcre2">/bin/bash|/bin/sh|/usr/bin/bash|/usr/bin/sh</field>
+    <description>Web server user spawned a shell - possible reverse shell or web shell</description>
+    <mitre>
+      <id>T1059</id>
+      <id>T1505.003</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-010: Reverse Shell Network Callback
+     MITRE: T1059 & T1071 — Execution / Command and Control
+     ============================================================ -->
+<group name="det010_web_shell_detection,correlation,">
+  <rule id="100601" level="14">
+    <if_sid>100600</if_sid>
+    <field name="audit.command" type="pcre2">/dev/tcp|nc|netcat|curl|wget</field>
+    <description>Web server user spawned shell with network callback - likely reverse shell</description>
+    <mitre>
+      <id>T1059</id>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-011: SSH Key Persistence
+     MITRE: T1098.004 & T1021.004 — Account Manipulation / Lateral Movement
+     ============================================================ -->
+<group name="det011_ssh_persistence,persistence,">
+  <rule id="100602" level="14">
+    <if_sid>550</if_sid>
+    <field name="file" type="pcre2">authorized_keys$</field>
+    <description>authorized_keys file modified - SSH backdoor likely planted</description>
+    <mitre>
+      <id>T1098.004</id>
+      <id>T1021.004</id>
+    </mitre>
+  </rule>
+</group>
+
+
+<!-- ============================================================
+     DET-012: Kerberoasting (RC4 TGS Request)
+     MITRE: T1558.003 — Steal or Forge Kerberos Tickets: Kerberoasting
+
+     NEW — keyed on ticketEncryptionType 0x17 (RC4) rather than a
+     bare 4769, since 4769 fires constantly for normal domain
+     traffic (machine account ticket renewals, etc). RC4 usage on
+     a TGS request is the actual "worth alerting on" signal.
+     ============================================================ -->
+<group name="det012_kerberoasting,windows_security,">
+  <rule id="100300" level="12">
+    <if_group>windows_security</if_group>
+    <field name="win.system.eventID">^4769$</field>
+    <field name="win.eventdata.ticketEncryptionType">^0x17$</field>
+    <description>Possible Kerberoasting: RC4 TGS ticket requested for $(win.eventdata.serviceName) by $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1558.003</id>
+    </mitre>
+  </rule>
+</group>
+
+<!--
+  ============================================================
+  STILL WORTH VERIFYING ON YOUR SYSTEM
+  ============================================================
+  These rules assume certain default Wazuh parent rule IDs exist
+  in YOUR installed ruleset version:
+    - 5710   (assumed: generic connection/firewall rule for DET-001)
+    - 60122  (assumed: Windows failed logon / RDP-related rule)
+    - 92003, 92010, 92013 (assumed: Sysmon network/process/registry
+      event rules)
+    - 80700  (assumed: Linux audit rule)
+    - 550    (assumed: syscheck "file added" rule)
+
+  If a rule never fires even on an event you know should match,
+  run:
+      sudo /var/ossec/bin/wazuh-logtest
+  and paste the raw event in. It will tell you which rule ID
+  actually matched (if any), which tells you whether the if_sid
+  parent you assumed is wrong for your ruleset version.
+-->
