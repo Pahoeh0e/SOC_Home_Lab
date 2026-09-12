@@ -4,7 +4,7 @@ A self-directed lab project deploying a full 5G Standalone (SA) core network in 
 
 ## 1. Motivation
 
-This project was built to gain practical exposure to the technologies referenced in UKTL's Graduate/Placement scheme — 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux-based container operations — rather than approaching them only from documentation. The goal was not just to get a working deployment, but to understand *why* each component behaves the way it does, and to document the debugging process as evidence of investigative method.
+This project was built to gain practical exposure to the technologies referenced in UKTL Associate Security and Privacy Researcher vacancy that uses 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux-based container operations. The goal was to get a working deployment and more importantly understand why each component behaves the way it does, and to document the debugging process as evidence of investigative method.
 
 ## 2. Architecture
 
@@ -25,25 +25,38 @@ UE (UERANSIM) ──radio (simulated)── gNB (UERANSIM)
                                        AUSF/UDM/UDR ── PCF/NRF/SCP
 ```
 
-All network functions communicate over Docker's internal bridge network (`172.22.0.0/24`), with each NF discovering the others via the NRF — a direct example of 5G's Service-Based Architecture, where functions register and discover each other over REST/HTTP2 rather than being statically wired together as in legacy telecom architectures.
+All network functions communicate over Docker's internal bridge network (`172.22.0.0/24`), with each NF discovering the others via the NRF where functions register and discover each other over REST/HTTP2 rather than being statically wired together as in legacy telecom architectures.
 
 ## 3. Environment
 
 - **Host:** Proxmox VE (KVM)
 - **Guest:** Ubuntu 24.04 LTS (Noble), minimal server install
-- **Container runtime:** Docker CE + Compose v2 (official Docker repo, not the distro's `docker.io` package)
+- **Container runtime:** Docker CE + Compose v2 (official Docker repo)
 
 ## 4. Build Log — Issues Encountered and Resolved
 
 Documenting the debugging process, since this is where most of the actual learning happened.
 
-### 4.1 Docker installation — package conflict
+First I consulted the documentation of open5gs.
+```bash
+cat TROUBLESHOOTING.md | less
+```
+Where I found and chose to use the prepared docker images.
 
-Initial install via `sudo apt install docker.io` did not include the Compose v2 plugin required by the project's compose files. Resolved by removing `docker.io` and installing from Docker's official APT repository (`docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-compose-plugin`).
+![prepared-images.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/precompiled-images-open5gs.png)
+![ueransim-image](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ueransim-open5gs-precompiled.png)
 
-**Takeaway:** Ubuntu's own repo and Docker's official repo package Docker differently; mixing them causes silent feature gaps rather than an obvious error.
+Also the documentation of what to edit in .env
 
-### 4.2 MongoDB crash — CPU feature (AVX) not exposed to the VM
+![env-docs.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/open5gs-troubleshooting-editting-conf.png)
+
+Then building the open5gs container
+
+![build-set-a.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/open5gs-precompiled-instructions.png)
+
+![sa-deploy.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/sa-deploy.yaml-build.png)
+
+### 4.1 MongoDB crash — CPU feature (AVX) not exposed to the VM
 
 MongoDB 5.0+ requires AVX CPU instructions. The container failed on start:
 
@@ -51,13 +64,17 @@ MongoDB 5.0+ requires AVX CPU instructions. The container failed on start:
 WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!
 ```
 
+![mongo-avx-error.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/mongo-avx-error-cat-avx.png)
+
 `cat /proc/cpuinfo | grep avx` on the guest returned nothing, despite the physical host CPU supporting AVX. Root cause: Proxmox's default virtual CPU type (`kvm64`) does not pass through all host CPU features.
 
 **Fix:** Proxmox VM → Hardware → Processors → CPU type set to `host` (full passthrough), followed by a full VM shutdown/restart (CPU model is only renegotiated on cold boot, not reboot).
 
 **Trade-off noted:** `host` CPU type prevents live migration to a node with a different physical CPU — acceptable for a single-node lab, not for a production multi-node cluster (where a named baseline model, e.g. `x86-64-v3`, would be the standard middle ground).
 
-### 4.3 SMF/UPF subnet misconfiguration
+![host-passthrough.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/host-passthrough-hardware.png)
+
+### 4.2 SMF/UPF subnet misconfiguration
 
 SMF crashed on startup:
 
@@ -65,7 +82,11 @@ SMF crashed on startup:
 [pfcp] FATAL: ogs_pfcp_subnet_add: Assertion `rv == OGS_OK' failed
 ```
 
-Root cause: `.env` defined `UE_IPV4_INTERNET` using a specific host address in CIDR form (`10.0.0.105/12`) rather than a proper network address, and the range also overlapped the VM's real LAN subnet — creating routing ambiguity even once parsing succeeded.
+![crash-.env.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-11%2020-14-15.png)
+
+![subnet-error.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-11%2019-47-18.png)
+
+Root cause: `.env` defined `UE_IPV4_INTERNET` using a specific host address in CIDR form (`10.0.0.105/12`) rather than a proper network address, and the range also overlapped the VM's real LAN subnet creating routing ambiguity even once parsing succeeded.
 
 **Fix:** Verified against the project's official `.env.example` and set the UE address pools to a distinct, non-overlapping private range:
 ```
@@ -75,7 +96,7 @@ UE_IPV4_IMS=10.46.0.0/24
 
 **Takeaway:** verified the fix against the upstream repository rather than trusting a plausible-sounding but incorrect first attempt — an assumption about variable naming was initially wrong and was corrected by checking the source.
 
-### 4.4 UE authentication failure — SQN synchronisation
+### 4.3 UE authentication failure — SQN synchronisation
 
 UE registration failed:
 ```
@@ -90,17 +111,26 @@ First failure: no subscriber existed for the UE's IMSI in the core's database. S
 
 **Fix:** Deleted and correctly re-created the subscriber, carefully matching each field to its `.env`-defined value, and verified key length (32 hex characters) via `wc -c` before re-entry.
 
+![.env-11111111-number](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/111111-32-subscriber-open5gs.png)
+
 **Takeaway:** SQN failures during AKA authentication are not always literal SQN desync — they can also surface as the resulting symptom of a K/OP key mismatch, since AKA's automatic resync mechanism itself depends on those same keys being correct.
+
+![success-subscriber.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/subcriber-correct.png)
 
 ## 5. Result — Working End-to-End Data Path
 
 Following the fixes above, the UE:
+
+![successful-start-containers.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/all-15-containers-open5gs.png)
+![deploy-success-logs.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/sa-deploy-logs-success-open5gs.png)
 
 1. Completed NAS registration (`Registration accept received`)
 2. Established a PDU session (`PDU Session establishment is successful PSI[1]`)
 3. Received a tunnel IP from the configured pool (`TUN interface[uesimtun0, 10.45.0.2] is up`)
 4. Successfully routed real traffic through the core to the internet:
 
+
+![docker-exec.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/docker-exec-ping-success.png)
 ```
 $ docker exec -it nr_ue ping -I uesimtun0 8.8.8.8
 13 packets transmitted, 13 received, 0% packet loss
@@ -166,6 +196,7 @@ Out of the box, Wazuh's SCA module benchmarked the host against the **CIS Ubuntu
 
 To tie the SOC monitoring directly to the 5G lab itself, rather than leaving it as a generic bolt-on, Wazuh's **syscheck** (FIM) module was configured to watch the Open5GS SMF configuration directory:
 
+![direcoties-syscheck.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-12%2017-13-05.png)
 ```xml
 <syscheck>
   ...
@@ -175,6 +206,8 @@ To tie the SOC monitoring directly to the 5G lab itself, rather than leaving it 
 *(Path is the SMF config directory identified in Section 4.3, the same file involved in the subnet-configuration bug — monitoring it here closes the loop between the build and the security-monitoring layer.)*
 
 After restarting the agent, a deliberate edit was made to `smf.yaml` to confirm detection. This generated a real-time FIM alert on the manager:
+
+![wazuh-open5gs-fim](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/open5gs-wazuh-fim.png)
 
 ```
 Rule: 550 — Integrity checksum changed.
@@ -203,6 +236,9 @@ Rather than reading raw alert JSON or relying solely on the dashboard, alerts we
 - Produces a consolidated report plus summary statistics (top agents, top alert types, top MITRE techniques)
 
 Sample output against the live alert set, filtered to the MITRE-mapped, security-relevant entries (as opposed to the SCA baseline findings, which score compliance rather than mapping to adversary technique):
+
+![log-parser-command](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/log-parser-wazuh-open5gs-fim-2.png)
+![log-parser-wazuh](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/open5gs-wazuh-log-parser-fim.png)
 
 ```
 [3] PAM: Login session opened.
