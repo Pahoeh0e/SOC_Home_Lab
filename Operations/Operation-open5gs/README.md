@@ -104,12 +104,12 @@ then, after provisioning a subscriber:
 ```
 [nas] [debug] Sending Authentication Failure due to SQN out of range
 ```
+![.env-11111111-number](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/111111-32-subscriber-open5gs.png)
 
 First failure: no subscriber existed for the UE's IMSI in the core's database. Second failure: the subscriber's security fields (K / Operator Key) were mistyped when hand-entering into the WebUI (no clipboard access to the headless VM) — a value intended for the OP field was mistakenly entered into the K field, and vice versa, corrupting the AKA authentication vectors.
 
 **Fix:** Deleted and correctly re-created the subscriber, carefully matching each field to its `.env`-defined value, and verified key length (32 hex characters) via `wc -c` before re-entry.
 
-![.env-11111111-number](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/111111-32-subscriber-open5gs.png)
 
 **Takeaway:** SQN failures during AKA authentication are not always literal SQN desync — they can also surface as the resulting symptom of a K/OP key mismatch, since AKA's automatic resync mechanism itself depends on those same keys being correct.
 
