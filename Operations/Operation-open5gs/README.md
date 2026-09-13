@@ -1,10 +1,10 @@
-# Containerised 5G Standalone Core — Lab Build & Analysis
+# Containerised 5G Standalone 
 
-A self-directed lab project deploying a full 5G Standalone (SA) core network in Docker, using Open5GS and UERANSIM, on a Proxmox-hosted Ubuntu VM. Built to develop hands-on familiarity with 5G Core architecture (SBA, NGAP, PFCP, GTP-U) and to practice systematic debugging of a multi-component containerised system.
+A self-directed lab project deploying a full 5G Standalone network in Docker, using Open5GS and UERANSIM, on a Proxmox-hosted Ubuntu VM. Built to develop hands-on familiarity with 5G Core architecture (SBA, NGAP, PFCP, GTP-U) and to practice systematic debugging of a multi-component containerised system.
 
 ## 1. Motivation
 
-This project was built to gain practical exposure to the technologies referenced in UKTL Associate Security and Privacy Researcher vacancy that uses 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux-based container operations. The goal was to get a working deployment and more importantly understand why each component behaves the way it does, and to document the debugging process as evidence of investigative method.
+This project was built to gain exposure to the technologies referenced in UKTL Associate Security and Privacy Researcher vacancy that uses 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux-based container operations. The goal was to get a working deployment and more importantly understand why each component behaves the way it does while documenting the debugging process.
 
 ## 2. Architecture
 
@@ -29,13 +29,11 @@ All network functions communicate over Docker's internal bridge network (`172.22
 
 ## 3. Environment
 
-- **Host:** Proxmox VE (KVM)
-- **Guest:** Ubuntu 24.04 LTS (Noble), minimal server install
+- **Host:** Proxmox VE 
+- **Guest:** Ubuntu 24.04, minimal server install
 - **Container runtime:** Docker CE + Compose v2 (official Docker repo)
 
 ## 4. Build Log — Issues Encountered and Resolved
-
-Documenting the debugging process, since this is where most of the actual learning happened.
 
 First I consulted the documentation of open5gs.
 ```bash
@@ -58,7 +56,7 @@ Then building the open5gs container
 
 ### 4.1 MongoDB crash — CPU feature (AVX) not exposed to the VM
 
-MongoDB 5.0+ requires AVX CPU instructions. The container failed on start:
+MongoDB 5.0+ requires AVX CPU instructions. So the container failed on start:
 
 ```
 WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!
@@ -148,8 +146,11 @@ Captured traffic on the Docker bridge network during a fresh UE registration cyc
 ```
 sctp || ngap || pfcp || gtpv2
 ```
+![wireshark-first-open5gs.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-12%2012-29-31.png)
 
 ### 6.1 Registration sequence observed
+
+![wireshark-long-ngap-pdu.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-longshot-wireshark.png)
 
 | Packet | NGAP/PFCP Procedure | Significance |
 |---|---|---|
@@ -166,6 +167,10 @@ sctp || ngap || pfcp || gtpv2
 
 **InitialUEMessage** protocol IEs (packet 2809): `RAN-UE-NGAP-ID`, `NAS-PDU`, `UserLocationInformation`, `RRCEstablishmentCause`, `UEContextRequest` — confirming the message structure matches the 3GPP NGAP specification for this procedure.
 
+![longshot-wireshark.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-long-wireshark.png)
+![longshot-wireshark-2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-long-wireshark-2.png)
+![![longshot-wireshark-2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-long-wireshark-3.png)
+
 **PFCP Session Establishment Request** (packet 3223) — decoded fields included:
 - Subscriber identity propagated from SMF to UPF: `IMSI 001011234567895`, `IMEI`, `MCC/MNC (001/01)`
 - `APN/DNN: internet`, `S-NSSAI: SST 01, SD ffffff` — confirming network slice information travels with the session
@@ -176,6 +181,8 @@ This confirmed, at the packet level, that subscriber and slice context genuinely
 
 ### 6.3 Traffic identified and excluded as non-signalling noise
 
+![PFCP-heartbeat.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-12%2012-29-31.png)
+
 Periodic `PFCP Heartbeat Request/Response` (SMF↔UPF) and `SCTP HEARTBEAT/HEARTBEAT_ACK` (gNB↔AMF) were identified as routine liveness checks between already-associated network functions, and excluded from the analysis as they are not part of the registration procedure itself.
 
 ## 7. SOC Tooling Integration — Wazuh + Custom Log Parser
@@ -185,6 +192,8 @@ To extend the project beyond deployment/protocol analysis and into a security-mo
 ### 7.1 Deployment
 
 - **Wazuh agent** installed on the `5gserver` VM (the Open5GS host) via the official DEB repository, enrolled against a separate Wazuh manager instance.
+
+!{sudo-tee.png](
 - **Debugging note:** the initial `apt-get install wazuh-agent` failed with `Unable to locate package`, because the Wazuh APT repository had not actually been added yet — a piping mistake (`sudo` applied to the wrong side of an `echo | tee` pipeline) meant the repo file was never written to `/etc/apt/sources.list.d/`. Re-running the `tee` step with `sudo` correctly applied resolved it; `sudo apt-get update` then correctly listed the Wazuh repository and the install succeeded. Kept as an example of a silent, non-obvious failure mode (the shell gave no error, it just didn't do what was intended).
 - Confirmed connectivity via the agent's own log (`/var/ossec/logs/ossec.log`) and cross-checked in the manager's **Discover** dashboard, which showed the agent (`5gserver`, agent ID `009`) actively reporting.
 
@@ -240,28 +249,8 @@ Sample output against the live alert set, filtered to the MITRE-mapped, security
 ![log-parser-command](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/log-parser-wazuh-open5gs-fim-2.png)
 ![log-parser-wazuh](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/open5gs-wazuh-log-parser-fim.png)
 
-```
-[3] PAM: Login session opened.
-  Agent:  5gserver
-  Rule:   5501
-  MITRE:  T1078 - Valid Accounts (Defense Evasion)
 
-[7] Integrity checksum changed.
-  Agent:  5gserver
-  Rule:   550
-  MITRE:  T1565.001 - Stored Data Manipulation (Impact)
-
-[7] Integrity checksum changed.
-  Agent:  5gserver
-  Rule:   550
-  MITRE:  T1565.001 - Stored Data Manipulation (Impact)
-
-================================================================
-Total alerts: 363
-================================================================
-```
-
-**Observation:** the two FIM events correspond to the same deliberate edit of `smf.yaml` (Wazuh logs both the write and the subsequent hash recomputation as separate integrity events). The bulk of the 363 total alerts remain SCA benchmark findings (Section 7.2), which — unlike the FIM and authentication events above — do not carry MITRE mappings, since SCA reports compliance posture rather than correlating to a specific adversary technique. The parser correctly distinguishes and surfaces the technique-mapped subset, which is the more actionable output for an investigation.
+**Observation:** the two FIM events correspond to the same deliberate edit of `smf.yaml` (Wazuh logs both the write and the subsequent hash recomputation as separate integrity events). The bulk of the 363 total alerts remain SCA benchmark findings (Section 7.2), which — unlike the FIM and authentication events above — do not carry MITRE mappings, since SCA reports compliance posture rather than correlating to a specific adversary technique. The parser correctly distinguishes and surfaces the technique-mapped subset, which is the more interesting output for an investigation.
 
 ### 7.5 Scope and limitations
 
