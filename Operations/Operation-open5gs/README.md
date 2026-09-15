@@ -1,10 +1,10 @@
 # Containerised 5G Standalone 
 
-A self-directed lab project deploying a full 5G Standalone network in Docker, using Open5GS and UERANSIM, on a Proxmox-hosted Ubuntu VM. Built to develop hands-on familiarity with 5G Core architecture (SBA, NGAP, PFCP, GTP-U) and to practice systematic debugging of a multi-component containerised system.
+A self-directed lab project deploying a full 5G Standalone network in Docker, using Open5GS and UERANSIM, on a Proxmox-hosted Ubuntu VM. Built to develop familiarity with 5G Core architecture (SBA, NGAP, PFCP, GTP-U) and to practice systematic debugging of a multi-component containerised system.
 
 ## 1. Motivation
 
-This project was built to gain exposure to the technologies referenced in UKTL Associate Security and Privacy Researcher vacancy that uses 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux-based container operations. The goal was to get a working deployment and more importantly understand why each component behaves the way it does while documenting the debugging process.
+This project was built to gain exposure to the technologies referenced in UKTL Associate Security and Privacy Researcher vacancy that uses 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux based container operations. The goal was to get a working deployment and more importantly understand why each component behaves the way it does while documenting the debugging process.
 
 ## 2. Architecture
 
@@ -33,7 +33,7 @@ All network functions communicate over Docker's internal bridge network (`172.22
 - **Guest:** Ubuntu 24.04, minimal server install
 - **Container runtime:** Docker CE + Compose v2 (official Docker repo)
 
-## 4. Build Log — Issues Encountered and Resolved
+## 4. Build Log (Issues Encountered and Resolved)
 
 First I consulted the documentation of open5gs.
 ```bash
@@ -68,7 +68,7 @@ WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system d
 
 **Fix:** Proxmox VM → Hardware → Processors → CPU type set to `host` (full passthrough), followed by a full VM shutdown/restart (CPU model is only renegotiated on cold boot, not reboot).
 
-**Trade-off noted:** `host` CPU type prevents live migration to a node with a different physical CPU — acceptable for a single-node lab, not for a production multi-node cluster (where a named baseline model, e.g. `x86-64-v3`, would be the standard middle ground).
+**Trade off:** `host` CPU type prevents live migration to a node with a different physical CPU — acceptable for a single-node lab, not for a production multi-node cluster (where a named baseline model, e.g. `x86-64-v3`, would be the standard middle ground).
 
 ![host-passthrough.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/host-passthrough-hardware.png)
 
@@ -92,9 +92,9 @@ UE_IPV4_INTERNET=10.45.0.0/24
 UE_IPV4_IMS=10.46.0.0/24
 ```
 
-**Takeaway:** verified the fix against the upstream repository rather than trusting a plausible-sounding but incorrect first attempt — an assumption about variable naming was initially wrong and was corrected by checking the source.
+**Takeaway:** verified the fix against the upstream repository rather than trusting a plausible-sounding but incorrect first attempt. My assumption about variable naming was initially wrong and was corrected by checking the source.
 
-### 4.3 UE authentication failure — SQN synchronisation
+### 4.3 UE authentication failure (SQN synchronisation)
 
 UE registration failed:
 ```
@@ -106,16 +106,16 @@ then, after provisioning a subscriber:
 ```
 ![.env-11111111-number](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/111111-32-subscriber-open5gs.png)
 
-First failure: no subscriber existed for the UE's IMSI in the core's database. Second failure: the subscriber's security fields (K / Operator Key) were mistyped when hand-entering into the WebUI (no clipboard access to the headless VM) — a value intended for the OP field was mistakenly entered into the K field, and vice versa, corrupting the AKA authentication vectors.
+First failure: no subscriber existed for the UE's IMSI in the core's database. Second failure: the subscriber's security fields (K / Operator Key) were mistyped when hand-entering into the WebUI (no clipboard access to the headless VM), a value intended for the OP field was mistakenly entered into the K field, and vice versa, corrupting the AKA authentication vectors.
 
-**Fix:** Deleted and correctly re-created the subscriber, carefully matching each field to its `.env`-defined value, and verified key length (32 hex characters) via `wc -c` before re-entry.
+**Fix:** Deleted and correctly re-created the subscriber, carefully matching each field to its `.env` defined value, and verified key length (32 hex characters) via `wc -c` before re-entry.
 
 
-**Takeaway:** SQN failures during AKA authentication are not always literal SQN desync — they can also surface as the resulting symptom of a K/OP key mismatch, since AKA's automatic resync mechanism itself depends on those same keys being correct.
+**Takeaway:** SQN failures during AKA authentication are not always literal SQN desync they can also surface as the resulting symptom of a K/OP key mismatch, since AKA's automatic resync mechanism itself depends on those same keys being correct.
 
 ![success-subscriber.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/subcriber-correct.png)
 
-## 5. Result — Working End-to-End Data Path
+## 5. Result (Working End-to-End Data Path)
 
 Following the fixes above, the UE:
 
@@ -171,13 +171,16 @@ sctp || ngap || pfcp || gtpv2
 ![longshot-wireshark-2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-long-wireshark-2.png)
 ![![longshot-wireshark-2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-long-wireshark-3.png)
 
-**PFCP Session Establishment Request** (packet 3223) — decoded fields included:
-- Subscriber identity propagated from SMF to UPF: `IMSI 001011234567895`, `IMEI`, `MCC/MNC (001/01)`
-- `APN/DNN: internet`, `S-NSSAI: SST 01, SD ffffff` — confirming network slice information travels with the session
-- `Create PDR / FAR / URR / QER / BAR` — the actual packet-handling rules instructing UPF how to detect, forward, and police the UE's traffic
-- `F-SEID` — the session identifier binding this PFCP session between SMF and UPF
 
-This confirmed, at the packet level, that subscriber and slice context genuinely propagate through the core's internal signalling (SMF→UPF) — not just at the RAN-facing edge.
+**PFCP Session Establishment Request** (packet 3223) — this is the message SMF sends to instruct UPF to set up a new data session. Decoding it showed:
+
+- Subscriber identity fields — `IMSI 001011234567895`, `IMEI`, `MCC/MNC (001/01)` — carried in the PFCP User ID Information Element. This confirms SMF isn't just telling UPF what to do with the traffic, it's also telling UPF whose traffic this is. Checking this against 3GPP TS 29.244 spec confirmed this is a legitimate field though the spec marks it as optional and controlled by a defined policy so that UP function must be in a trusted environment before containing `User ID`. Open5GS enables it by default.
+- `APN/DNN: internet`, `S-NSSAI: SST 01, SD ffffff` — confirms the session's network slice and access point identity travel with it, so UPF knows not just who the subscriber is but what kind of session and slice they're connecting through.
+- `Create PDR / FAR / URR / QER / BAR`— the actual forwarding rules: how UPF should detect the UE's packets (PDR), where to forward them (FAR), how to measure usage (URR), how to police/rate-limit (QER), and how to buffer them if needed (BAR).
+- `F-SEID` — the unique session ID binding this specific PFCP session between SMF and UPF, so future messages about this session can reference it unambiguously.
+
+Significance: this confirmed, at the packet level, that subscriber and slice context go through through the core's internal signalling (SMF→UPF) not only at the RAN-facing edge where the UE first presents its identity to the AMF. Identity and context don't just enter the network once at the entrance, they are actively carried between internal network functions as the session is built.
+
 
 ### 6.3 Traffic identified and excluded as non-signalling noise
 
@@ -185,21 +188,22 @@ This confirmed, at the packet level, that subscriber and slice context genuinely
 
 Periodic `PFCP Heartbeat Request/Response` (SMF↔UPF) and `SCTP HEARTBEAT/HEARTBEAT_ACK` (gNB↔AMF) were identified as routine liveness checks between already-associated network functions, and excluded from the analysis as they are not part of the registration procedure itself.
 
-## 7. SOC Tooling Integration — Wazuh + Custom Log Parser
+## 7. SOC Tooling Integration (Wazuh + Custom Log Parser)
 
-To extend the project beyond deployment/protocol analysis and into a security-monitoring context, a Wazuh manager/agent pair was deployed and pointed at the lab, with a custom-built Python analyser used to process the resulting alert stream.
+To extend the project beyond protocol analysis and into a security monitoring context, a Wazuh agent was deployed and pointed at the lab, with a custom [Python analyser](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Automation/Log-parser.md) used to process the resulting alert stream.
 
 ### 7.1 Deployment
 
 - **Wazuh agent** installed on the `5gserver` VM (the Open5GS host) via the official DEB repository, enrolled against a separate Wazuh manager instance.
 
-!{sudo-tee.png](
 - **Debugging note:** the initial `apt-get install wazuh-agent` failed with `Unable to locate package`, because the Wazuh APT repository had not actually been added yet — a piping mistake (`sudo` applied to the wrong side of an `echo | tee` pipeline) meant the repo file was never written to `/etc/apt/sources.list.d/`. Re-running the `tee` step with `sudo` correctly applied resolved it; `sudo apt-get update` then correctly listed the Wazuh repository and the install succeeded. Kept as an example of a silent, non-obvious failure mode (the shell gave no error, it just didn't do what was intended).
 - Confirmed connectivity via the agent's own log (`/var/ossec/logs/ossec.log`) and cross-checked in the manager's **Discover** dashboard, which showed the agent (`5gserver`, agent ID `009`) actively reporting.
 
 ### 7.2 Security Configuration Assessment (SCA)
 
 Out of the box, Wazuh's SCA module benchmarked the host against the **CIS Ubuntu Linux 24.04 LTS Benchmark v1.0.0**, surfacing configuration hygiene findings (e.g. duplicate UID/GID checks, disabled filesystem modules) and an overall compliance score. This runs automatically and required no additional configuration — useful as a baseline hardening check on the VM hosting the 5G core.
+
+![SCA-benchmark-dashboard](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/SCA-wazuh-dashboard-open5gs.png)
 
 ### 7.3 File Integrity Monitoring (FIM) on the 5G Core configuration
 
@@ -230,15 +234,9 @@ MITRE: T1565.001 - Stored Data Manipulation (Impact)
 
 This confirms Wazuh correctly detects and hashes-out unauthorised changes to core network configuration in real time, and automatically maps the event to a MITRE ATT&CK technique (T1565.001, Stored Data Manipulation) without any custom rule-writing required — the mapping comes from Wazuh's default ruleset for file integrity events.
 
-A related alert was also captured from a local authentication event on the same host:
-```
-Rule: 5501 — PAM: Login session opened.
-MITRE: T1078 - Valid Accounts (Defense Evasion)
-```
-
 ### 7.4 Custom Wazuh Alert Parser
 
-Rather than reading raw alert JSON or relying solely on the dashboard, alerts were processed with a self-written Python script ([`wazuh_parser.py`](#), part of a broader personal automation/tooling repository) that:
+Rather than reading raw alert JSON or relying solely on the dashboard, alerts were processed with a self-written Python script ([`wazuh_parser.py`](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Automation/Log-parser.md)), part of a broader personal automation/tooling repository) that:
 - Parses each line of `/var/ossec/logs/alerts/alerts.json`
 - Extracts rule level, description, agent, and any associated MITRE ATT&CK ID/tactic/technique
 - Labels severity (INFO/LOW/MEDIUM/HIGH/CRITICAL) based on rule level
@@ -250,11 +248,11 @@ Sample output against the live alert set, filtered to the MITRE-mapped, security
 ![log-parser-wazuh](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/open5gs-wazuh-log-parser-fim.png)
 
 
-**Observation:** the two FIM events correspond to the same deliberate edit of `smf.yaml` (Wazuh logs both the write and the subsequent hash recomputation as separate integrity events). The bulk of the 363 total alerts remain SCA benchmark findings (Section 7.2), which — unlike the FIM and authentication events above — do not carry MITRE mappings, since SCA reports compliance posture rather than correlating to a specific adversary technique. The parser correctly distinguishes and surfaces the technique-mapped subset, which is the more interesting output for an investigation.
+**Observation:** the two FIM events correspond to the same deliberate edit of `smf.yaml` (Wazuh logs both the write and the subsequent hash recomputation as separate integrity events). The bulk of the 363 total alerts remain SCA benchmark findings (Section 7.2), which unlike the FIM and authentication events above do not carry MITRE mappings, since SCA reports compliance posture rather than correlating to a specific adversary technique. The parser correctly distinguishes and surfaces the technique-mapped subset.
 
 ### 7.5 Scope and limitations
 
-This integration is intentionally scoped as **host-level** security monitoring — process activity, configuration compliance, and file integrity on the VM running the 5G core. Wazuh does not natively parse 5G signalling protocols (NGAP/PFCP/GTP); protocol-level analysis remains the separate, packet-capture-based exercise documented in Section 6. Combined, the two give complementary coverage: Wireshark for what's happening *on the 5G signalling plane*, Wazuh for what's happening *on the infrastructure hosting it*.
+This integration is intentionally scoped as **host-level** security monitoring, process activity and configuration compliance on the VM running the 5G core. Wazuh does not natively parse 5G signalling protocols (NGAP/PFCP/GTP); protocol-level analysis remains the separate, packet-capture-based exercise documented in Section 6. Combined, the two give complementary coverage where Wireshark shows what's happening on the 5G signalling environment and Wazuh shows what's happening on the infrastructure hosting it.
 
 ## 8. Skills Demonstrated
 
