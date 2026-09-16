@@ -124,8 +124,11 @@ As well as [SOC fortress](https://github.com/socfortress/Wazuh-Rules) rules for 
 | **DET-012** | Event Log Clearing | [T1070.001](https://attack.mitre.org/techniques/T1070/001/) | Sysmon + Wazuh | Medium |
 | **DET-013** | Firewall Modification (Netsh) | [T1562.004](https://attack.mitre.org/techniques/T1562/004/) | Sysmon + Wazuh | Medium |
 | **DET-014** | Scheduled Task Creation | [T1053.005](https://attack.mitre.org/techniques/T1053/005/) | Sysmon + Wazuh | Medium |
+| **DET-015** | SSH backdoor created | [T1098.004](https://d3fend.mitre.org/offensive-technique/attack/T1098.004/), [T1021.004](https://attack.mitre.org/techniques/T1021/004/) | Sysmon + Wazuh | High |
+| **DET-016** | Kerberoasting | [T1558.003](https://attack.mitre.org/techniques/T1558/003/) | Windows Event Logs + Wazuh | High |
 
 ---
+
 
 ## Operations
 
