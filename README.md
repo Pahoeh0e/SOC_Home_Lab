@@ -159,6 +159,7 @@ See [Operations](Operations) for full red and blue team procedures with commands
 | [Custom-Detection-Rules.md](Custom-Dection-Rules.md) | SPL queries, Wazuh rules, Snort rules, MITRE mappings |
 | [Operations.md](Operations) | Step-by-step attack procedures with expected detections |
 | [Troubleshooting.md](Troubleshooting.md) | Walk-through of troubleshooting log and lessons learnt |
+| [Automation](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Automation) | Python tools made for automation and SOC ease of use |
 
 ---
 
@@ -172,4 +173,4 @@ See [Operations](Operations) for full red and blue team procedures with commands
 
 ---
 
-**Last Updated**: August 2026
+**Last Updated**: September 2026
