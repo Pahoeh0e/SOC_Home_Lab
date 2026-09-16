@@ -142,7 +142,11 @@ See [Operations](Operations) for full red and blue team procedures with commands
 | 7 | PsExec execution | Wazuh 100016 |
 | 8 | PsExec pipe detection | Wazuh 100502 |
 | 9 | CertUtil download from staging server | Wazuh 100105 |
+| 10 | authorized_keys file modified | Wazuh 100602 |
+| 11 | Kerberoasting | Wazuh 100300 |
+
 ---
+
 
 ## Documentation
 
