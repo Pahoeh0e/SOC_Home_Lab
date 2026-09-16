@@ -255,10 +255,10 @@
 
 <!--
   ============================================================
-  STILL WORTH VERIFYING ON YOUR SYSTEM
+  VERIFY ON YOUR SYSTEM
   ============================================================
   These rules assume certain default Wazuh parent rule IDs exist
-  in YOUR installed ruleset version:
+  in your installed ruleset version:
     - 5710   (assumed: generic connection/firewall rule for DET-001)
     - 60122  (assumed: Windows failed logon / RDP-related rule)
     - 92003, 92010, 92013 (assumed: Sysmon network/process/registry
@@ -270,6 +270,6 @@
   run:
       sudo /var/ossec/bin/wazuh-logtest
   and paste the raw event in. It will tell you which rule ID
-  actually matched (if any), which tells you whether the if_sid
+  actually matched, which tells you whether the if_sid
   parent you assumed is wrong for your ruleset version.
 -->
