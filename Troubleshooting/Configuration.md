@@ -3,12 +3,12 @@
 ## Format
 
 Each guide follows the same structure:
-- **What went wrong** — Symptomshat you see when the issue occurs
-- **The Problem** — why it happens
-- **How I Figured It Out** — commands and checks to confirm
-- **Fix/Fixes** — step-by-step resolution
+- **What went wrong** — Symptoms that you see when the issue occurs
+- **The Problem** — Why it happens
+- **How I Figured It Out** — Commands and checks to confirm
+- **Fix/Fixes** — Step-by-step resolution
 - **How to Check It's Working** - Confirming the fix works
-- **lessons learnt** — how to avoid it next time
+- **lessons learnt** — How to avoid it next time
 
 
 ## Index:
