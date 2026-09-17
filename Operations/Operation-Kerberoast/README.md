@@ -99,7 +99,7 @@ For all custom rules view the [Custom-Detection-Rules](https://github.com/Pahoeh
 
 Add this to /var/ossec/etc/rules/local_rules.xml on the Wazuh manager:
 
-xml
+```xml
 <group name="det012_kerberoasting,windows_security,">
   <rule id="110300" level="12">
     <if_group>windows_security</if_group>
@@ -111,7 +111,7 @@ xml
     </mitre>
   </rule>
 </group>
-
+```
 
 Kerberoasting Detection (RC4 TGS Request)
 
@@ -128,11 +128,12 @@ Triage
 
 ## Remediation
 
-Planned: force the Kerberoast account to AES-only encryption (Set-ADUser Kerberoast -KerberosEncryptionType AES256), re-run the attack, and confirm the resulting 4769 shows ticketEncryptionType: 0x12 instead of 0x17 and that rule 110300 correctly does not fire on it, since the RC4 weakness it targets no longer exists. This demonstrates the rule is precise to the actual risk indicator rather than alerting on ticket requests generally.
+Force the Kerberoast account to AES-only encryption (Set-ADUser Kerberoast -KerberosEncryptionType AES256) 0x12 instead of 0x17 and that rule 110300 correctly does not fire on it, since the RC4 weakness it targets no longer exists. This demonstrates the rule is precise to the actual risk indicator rather than alerting on ticket requests generally.
 
-Kill Chain Timeline
-Time	MITRE ID	Phase	Detection
-T+0s	T1087.002	Discovery	svc-splunk enumerates SPNs via setspn -Q */*
-T+0s	T1558.003	Credential Access	Rubeus requests RC4 TGS for Kerberoast account
-T+0s	110300	Credential Access	Wazuh fires on RC4-encrypted 4769 for Kerberoast
-T+[X]s	T1110.002	Credential Access	Password cracked offline via Hashcat
+## Kill Chain Timeline
+|Time |	MITRE ID	| Phase	| Detection |
+|-----|-----------|-------|-----------|
+| T+0s |	T1087.002	| Discovery	| svc-splunk enumerates SPNs |
+|T+0s	| T1558.003	| Credential Access	| Rubeus requests RC4 TGS for Kerberoast account |
+|T+0s	| 110300 | Credential Access	| Wazuh fires on RC4-encrypted 4769 for Kerberoast |
+|T+[X]s |	T1110.002	| Credential Access |	Password cracked offline via Hashcat |
