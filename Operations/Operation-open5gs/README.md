@@ -254,7 +254,101 @@ Sample output against the live alert set, filtered to the MITRE-mapped, security
 
 This integration is intentionally scoped as **host-level** security monitoring, process activity and configuration compliance on the VM running the 5G core. Wazuh does not natively parse 5G signalling protocols (NGAP/PFCP/GTP); protocol-level analysis remains the separate, packet-capture-based exercise documented in Section 6. Combined, the two give complementary coverage where Wireshark shows what's happening on the 5G signalling environment and Wazuh shows what's happening on the infrastructure hosting it.
 
-## 8. Skills Demonstrated
+
+## 8. SBI Fuzzing Test (py5sig)
+
+To extend the project from deployment and passive protocol analysis into active security testing, I evaluated [`py5sig`](https://github.com/ANSSI-FR/py5sig), an open-source SBA/SBI fuzzer published by ANSSI (the French national cybersecurity agency), against the deployed core's internal HTTP/2-based Service-Based Interfaces.
+
+### 8.1 Motivation
+
+The NRF/AMF/SMF/etc. communicate over `nnrf-nfm`, `nnrf-disc`, and `nsmf-pdusession` REST-style APIs. Rather than only observing this traffic passively (as in Section 6), the goal here was to actively test how the core's SBI implementations handle malformed or adversarial input — a natural extension of the protocol analysis already done, and a closer match to a "vulnerability researcher" testing methodology than a purely deployment-and-observe exercise.
+
+### 8.2 Setup and Connectivity Debugging
+
+py5sig was installed in a Python virtual environment on the host VM (outside the Docker network) and pointed at the NRF's exposed SBI port. Establishing basic connectivity required working through several protocol-level misdiagnoses in sequence:
+
+| Attempt | Result | Diagnosis |
+|---|---|---|
+| `curl http://<nrf-ip>:7777/nnrf-nfm/v1/nf-instances` | `Received HTTP/0.9 when not allowed` | Looked like a TLS mismatch at first |
+| `curl -k https://<nrf-ip>:7777/...` | `OpenSSL: wrong version number` | Confirmed it was *not* TLS either |
+| `curl --http2-prior-knowledge http://<nrf-ip>:7777/...` | Clean `HTTP/2 400`, JSON error body | Correct protocol: Open5GS's SBI runs **HTTP/2 cleartext (h2c)**, which neither plain HTTP/1.1 nor TLS negotiation matched |
+
+The `400` response itself (`"title":"Invalid API name"`) was also informative: `nnrf-nfm` only supports operations on a specific `nfInstanceId` (register/update/deregister), not a bulk list. The correct discovery call uses the separate **`Nnrf_NFDiscovery`** service:
+
+```bash
+curl --http2-prior-knowledge \
+  "http://<nrf-ip>:7777/nnrf-disc/v1/nf-instances?target-nf-type=AMF&requester-nf-type=SMF"
+```
+
+This returned the full registered NF topology (AMF, SMF, UDM, UDR, AUSF, PCF, BSF, NSSF, SCP), confirming both the correct transport (h2c) and the correct API surface before py5sig itself was tested against the same target.
+
+**Takeaway:** three consecutive failures (HTTP/0.9, TLS version mismatch, then a 400) each looked like a different category of problem, but methodically changing one variable at a time (transport, then encryption, then API path) isolated the actual cause rather than guessing.
+
+### 8.3 Bug Found: Malformed YAML in py5sig's Bundled Specs
+
+Running py5sig's own discovery mode succeeded and returned the same NF topology as the manual `curl` check. However, invoking `--fuzzing` initially crashed with:
+
+ruamel.yaml.scanner.ScannerError: while scanning for the next token
+found character '\t' that cannot start any token
+in "<unicode string>", line 1081, column 18
+
+
+A clean reinstall (fresh venv, fresh `pip install .`) reproduced the identical crash, ruling out a local environment issue. `grep -rlP '\t'` against py5sig's installed package located the fault in two of its bundled 3GPP OpenAPI spec files:
+
+- `specs/TS29122_MonitoringEvent.yaml`
+- `specs/TS29512_Npcf_SMPolicyControl.yaml`
+
+Both contained literal tab characters, which `ruamel.yaml` (YAML forbids tabs for indentation) refused to parse. This is a genuine upstream bug in the shipped tool, not a configuration error on my part. Fixed locally with:
+
+```bash
+sed -i 's/\t/  /g' <path>/TS29122_MonitoringEvent.yaml
+sed -i 's/\t/  /g' <path>/TS29512_Npcf_SMPolicyControl.yaml
+```
+
+**Takeaway:** running from a deliberately clean reinstall before debugging further is what distinguished "bug in the tool" from "mistake in my setup" — worth doing before assuming a self-inflicted cause, especially after an accidental double-install earlier in the session.
+
+### 8.4 Fuzzing Run and Observations
+
+With the spec files patched, `py5sig --fuzzing` was run against the AMF→SMF SBI pairing for approximately 6 minutes, with NRF logs tailed live in a separate SSH session (`docker compose -f sa-deploy.yaml logs -f nrf`) and saved to file for later review.
+
+**Example payload observed** (SQL-injection-style strings injected into subscriber identity fields on `POST /nsmf-pdusession/v1/sm-contexts`):
+
+```json
+{
+  "pei": "' or username like '%",
+  "supi": "' or username like '%",
+  "unauthenticatedSupi": "' or username like '%",
+  "n1SmMsg": { "contentId": "n1SmMsg" }
+}
+```
+
+**Result:** clean `400 Bad Request` — no injection behaviour, no crash, no unhandled exception.
+
+**NRF logs during the run** showed a consistent pattern of malformed discovery requests (invalid combined `scope=nnrf-disc nnrf-nfm` parameters, non-existent `nfInstanceId` values) being rejected cleanly at the parser level:
+
+[sbi] ERROR: JSON parse error [nfInstanceId=...&targetNfType=NRF&scope=nnrf-disc nnrf-nfm&grant_type=client_credentials]
+[sbi] ERROR: parse_content() failed
+[sbi] ERROR: cannot parse HTTP message
+
+
+**Post-run verification:** container health (`docker compose ps`) showed all services remained `Up` throughout, with no restarts. A before/after `Nnrf_NFDiscovery` capture, diffed with `diff`, showed **zero differences** in the registered NF topology — confirming the fuzzing run caused no observable state corruption in addition to causing no crash.
+
+**Methodology note:** my first before/after diff attempt returned a `0a1,604` diff (i.e. "add all 604 lines") — not because fuzzing changed 604 lines, but because my baseline capture file was empty due to an earlier failed command. I caught this by checking file line counts (`wc -l`) rather than trusting the diff output at face value, redid the baseline capture, and confirmed a genuine zero-diff result. Kept here as a reminder that a "no differences" result is only meaningful once the comparison itself is verified to be valid.
+
+### 8.5 Outcome and Limitations
+
+**Findings:**
+- No crash or state corruption observed under mutation-based SBI fuzzing of the AMF/SMF/NRF pairing over this test window
+- SQL-injection-style payloads in subscriber identity fields were correctly rejected
+- Malformed SBI query parameters were correctly rejected at the NRF's parser level
+- One real upstream bug identified and worked around in py5sig's shipped OpenAPI spec files
+
+**Limitations, stated explicitly:**
+- This was a short (~6 minute), single-session run against one NF pairing (AMF↔SMF) — not a long-running or coverage-guided campaign, and a longer run or different NF pairings could surface different results
+- py5sig's mutations are not coverage-guided (no binary instrumentation), so a negative result here indicates "no bug found within this mutation strategy and time window," not "no bugs exist"
+- Testing was limited to the SBI/HTTP2 layer; the N2/NGAP interface (RAN-to-AMF) was not covered by this tool and remains a separate, harder fuzzing target for future work (see `5Greplay`/stateful-NGAP-fuzzing research)
+
+## 9. Skills Demonstrated
 
 - Linux system administration (Ubuntu, systemd, Docker/containerd internals)
 - Virtualisation (Proxmox/KVM CPU passthrough configuration)
@@ -265,3 +359,7 @@ This integration is intentionally scoped as **host-level** security monitoring, 
 - Custom Python tooling for security log parsing and MITRE ATT&CK-mapped reporting
 - Systematic debugging: isolating root cause across OS, virtualisation, application-config, and data-entry layers
 - Verifying assumptions against primary/upstream sources rather than trusting first plausible explanations
+- Fuzz testing methodology: SBI/HTTP2 mutation fuzzing, oracle design (crash detection, topology-diff verification), and honestly scoping findings against limitations
+- HTTP/2 cleartext (h2c) protocol debugging, distinguishing transport-layer, TLS-layer, and API-layer failure modes
+- Identifying, isolating, and working around a bug in third-party open-source security tooling
+- Self-correcting a flawed verification step (invalid baseline diff) before drawing conclusions from it
