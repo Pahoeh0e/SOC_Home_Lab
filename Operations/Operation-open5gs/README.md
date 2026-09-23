@@ -131,8 +131,6 @@ Following the fixes above, the UE:
 ![docker-exec.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/docker-exec-ping-success.png)
 ```
 $ docker exec -it nr_ue ping -I uesimtun0 8.8.8.8
-13 packets transmitted, 13 received, 0% packet loss
-rtt min/avg/max/mdev = 26.068/31.053/74.514/12.600 ms
 ```
 
 (Achieved via a NAT masquerade rule on the host, allowing UPF's internal tunnel interface to route the UE's private address pool out to the internet:)
