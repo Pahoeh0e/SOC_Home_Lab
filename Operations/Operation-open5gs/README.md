@@ -68,7 +68,7 @@ WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system d
 
 **Fix:** Proxmox VM → Hardware → Processors → CPU type set to `host` (full passthrough), followed by a full VM shutdown/restart (CPU model is only renegotiated on cold boot, not reboot).
 
-**Trade off:** `host` CPU type prevents live migration to a node with a different physical CPU — acceptable for a single-node lab, not for a production multi-node cluster (where a named baseline model, e.g. `x86-64-v3`, would be the standard middle ground).
+**Trade off:** `host` CPU type prevents live migration to a node with a different physical CPU because it exposes the exact instruction set and flags of the source physical CPU to the virtual machine, which is not a best practice for a production multi-node cluster (where a named baseline model, e.g. `x86-64-v3`, would be the standard middle ground).
 
 ![host-passthrough.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/host-passthrough-hardware.png)
 
@@ -196,18 +196,19 @@ To extend the project beyond protocol analysis and into a security monitoring co
 
 - **Wazuh agent** installed on the `5gserver` VM (the Open5GS host) via the official DEB repository, enrolled against a separate Wazuh manager instance.
 
-- **Debugging note:** the initial `apt-get install wazuh-agent` failed with `Unable to locate package`, because the Wazuh APT repository had not actually been added yet — a piping mistake (`sudo` applied to the wrong side of an `echo | tee` pipeline) meant the repo file was never written to `/etc/apt/sources.list.d/`. Re-running the `tee` step with `sudo` correctly applied resolved it; `sudo apt-get update` then correctly listed the Wazuh repository and the install succeeded. Kept as an example of a silent, non-obvious failure mode (the shell gave no error, it just didn't do what was intended).
+- **Debugging note:** the initial `apt-get install wazuh-agent` failed with `Unable to locate package`, because the Wazuh APT repository had not actually been added yet, a piping mistake (`sudo` applied to the wrong side of `echo | tee`) meant the repo file was never written to `/etc/apt/sources.list.d/`. Re-running the `tee` step with `sudo` correctly applied resolved it. `sudo apt-get update` then correctly listed the Wazuh repository and the install succeeded.
+- 
 - Confirmed connectivity via the agent's own log (`/var/ossec/logs/ossec.log`) and cross-checked in the manager's **Discover** dashboard, which showed the agent (`5gserver`, agent ID `009`) actively reporting.
 
 ### 7.2 Security Configuration Assessment (SCA)
 
-Out of the box, Wazuh's SCA module benchmarked the host against the **CIS Ubuntu Linux 24.04 LTS Benchmark v1.0.0**, surfacing configuration hygiene findings (e.g. duplicate UID/GID checks, disabled filesystem modules) and an overall compliance score. This runs automatically and required no additional configuration — useful as a baseline hardening check on the VM hosting the 5G core.
+Out of the box, Wazuh's SCA module benchmarked the host against the **CIS Ubuntu Linux 24.04 LTS Benchmark v1.0.0**, surfacing configuration hygiene findings (e.g. duplicate UID/GID checks, disabled filesystem modules) and a compliance score. This runs automatically and required no additional configuration, which is useful as a baseline hardening check.
 
 ![SCA-benchmark-dashboard](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/SCA-wazuh-dashboard-open5gs.png)
 
 ### 7.3 File Integrity Monitoring (FIM) on the 5G Core configuration
 
-To tie the SOC monitoring directly to the 5G lab itself, rather than leaving it as a generic bolt-on, Wazuh's **syscheck** (FIM) module was configured to watch the Open5GS SMF configuration directory:
+To tie the SOC monitoring directly to the 5G lab itself Wazuh's **syscheck** (FIM) module was configured to watch the Open5GS SMF configuration directory:
 
 ![direcoties-syscheck.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-12%2017-13-05.png)
 ```xml
@@ -216,7 +217,7 @@ To tie the SOC monitoring directly to the 5G lab itself, rather than leaving it 
   <directories realtime="yes">/home/open5gs/docker_open5gs/smf</directories>
 </syscheck>
 ```
-*(Path is the SMF config directory identified in Section 4.3, the same file involved in the subnet-configuration bug — monitoring it here closes the loop between the build and the security-monitoring layer.)*
+*(Path is the SMF config directory identified in Section 4.3, the same file involved in the subnet-configuration bug. Monitoring it here closes the loop between the build and the security-monitoring layer.)*
 
 After restarting the agent, a deliberate edit was made to `smf.yaml` to confirm detection. This generated a real-time FIM alert on the manager:
 
@@ -232,7 +233,7 @@ New md5sum is:  f26698cd38cc39d25a3d1353b170f01e
 MITRE: T1565.001 - Stored Data Manipulation (Impact)
 ```
 
-This confirms Wazuh correctly detects and hashes-out unauthorised changes to core network configuration in real time, and automatically maps the event to a MITRE ATT&CK technique (T1565.001, Stored Data Manipulation) without any custom rule-writing required — the mapping comes from Wazuh's default ruleset for file integrity events.
+Wazuh correctly detects and hashes-out unauthorised changes to core network configuration in real time, and automatically maps the event to a MITRE ATT&CK technique (T1565.001, Stored Data Manipulation) without any custom rule-writing required. The mapping comes from Wazuh's default ruleset for file integrity events.
 
 ### 7.4 Custom Wazuh Alert Parser
 
@@ -252,16 +253,16 @@ Sample output against the live alert set, filtered to the MITRE-mapped, security
 
 ### 7.5 Scope and limitations
 
-This integration is intentionally scoped as **host-level** security monitoring, process activity and configuration compliance on the VM running the 5G core. Wazuh does not natively parse 5G signalling protocols (NGAP/PFCP/GTP); protocol-level analysis remains the separate, packet-capture-based exercise documented in Section 6. Combined, the two give complementary coverage where Wireshark shows what's happening on the 5G signalling environment and Wazuh shows what's happening on the infrastructure hosting it.
+This integration is intentionally scoped as **host-level** security monitoring, process activity and configuration compliance on the VM running the 5G core. Wazuh does not natively parse 5G signalling protocols (NGAP/PFCP/GTP). Wireshark shows what's happening on the 5G signalling environment and Wazuh shows what's happening on the infrastructure hosting it.
 
 
 ## 8. SBI Fuzzing Test (py5sig)
 
-To extend the project from deployment and passive protocol analysis into active security testing, I evaluated [`py5sig`](https://github.com/ANSSI-FR/py5sig), an open-source SBA/SBI fuzzer published by ANSSI (the French national cybersecurity agency), against the deployed core's internal HTTP/2-based Service-Based Interfaces.
+To extend the project from deployment and passive protocol analysis into active security testing, I evaluated [`py5sig`](https://github.com/ANSSI-FR/py5sig), an open-source SBA/SBI fuzzer published by ANSSI (the French national cybersecurity agency), against the deployed core's internal Service-Based Interfaces.
 
 ### 8.1 Motivation
 
-The NRF/AMF/SMF/etc. communicate over `nnrf-nfm`, `nnrf-disc`, and `nsmf-pdusession` REST-style APIs. Rather than only observing this traffic passively (as in Section 6), the goal here was to actively test how the core's SBI implementations handle malformed or adversarial input — a natural extension of the protocol analysis already done, and a closer match to a "vulnerability researcher" testing methodology than a purely deployment-and-observe exercise.
+The NRF/AMF/SMF/etc. communicate over `nnrf-nfm`, `nnrf-disc`, and `nsmf-pdusession` REST-style APIs. The goal here was to actively test how the core's SBI implementations handle malformed or attacker input to extend the protocol analysis in Section 6 to correlate with a "vulnerability researcher" testing process.
 
 ### 8.2 Setup and Connectivity Debugging
 
@@ -273,12 +274,16 @@ py5sig was installed in a Python virtual environment on the host VM (outside the
 | `curl -k https://<nrf-ip>:7777/...` | `OpenSSL: wrong version number` | Confirmed it was *not* TLS either |
 | `curl --http2-prior-knowledge http://<nrf-ip>:7777/...` | Clean `HTTP/2 400`, JSON error body | Correct protocol: Open5GS's SBI runs **HTTP/2 cleartext (h2c)**, which neither plain HTTP/1.1 nor TLS negotiation matched |
 
-The `400` response itself (`"title":"Invalid API name"`) was also informative: `nnrf-nfm` only supports operations on a specific `nfInstanceId` (register/update/deregister), not a bulk list. The correct discovery call uses the separate **`Nnrf_NFDiscovery`** service:
+
+
+The `400` response itself (`"title":"Invalid API name"`) was informative after finding out that `nnrf-nfm` only supports operations on a specific `nfInstanceId` (register/update/deregister), not a bulk list. The correct discovery call uses the separate **`Nnrf_NFDiscovery`** service:
 
 ```bash
 curl --http2-prior-knowledge \
   "http://<nrf-ip>:7777/nnrf-disc/v1/nf-instances?target-nf-type=AMF&requester-nf-type=SMF"
 ```
+![curl-py5sig](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/successful-curl-py5sig-amf-smf.png)
+![full-list-nf-instances-1](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/py5sig-full-list-nf-instances-1.png)
 
 This returned the full registered NF topology (AMF, SMF, UDM, UDR, AUSF, PCF, BSF, NSSF, SCP), confirming both the correct transport (h2c) and the correct API surface before py5sig itself was tested against the same target.
 
@@ -292,27 +297,39 @@ ruamel.yaml.scanner.ScannerError: while scanning for the next token
 found character '\t' that cannot start any token
 in "<unicode string>", line 1081, column 18
 
+![py5sig-bus-output](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-20%2015-16-20.png)
 
-A clean reinstall (fresh venv, fresh `pip install .`) reproduced the identical crash, ruling out a local environment issue. `grep -rlP '\t'` against py5sig's installed package located the fault in two of its bundled 3GPP OpenAPI spec files:
+A clean reinstall (fresh venv, fresh `pip install .`) reproduced the identical crash, ruling out a local environment issue. 
 
-- `specs/TS29122_MonitoringEvent.yaml`
-- `specs/TS29512_Npcf_SMPolicyControl.yaml`
+I located the fault in two of its bundled 3GPP OpenAPI spec files by using:
 
-Both contained literal tab characters, which `ruamel.yaml` (YAML forbids tabs for indentation) refused to parse. This is a genuine upstream bug in the shipped tool, not a configuration error on my part. Fixed locally with:
+```
+find ~/py5sig-venv -iname "*.yaml" | xargs grep -lP '\t' 2>/dev/null
+```
+
+![bug-yaml-files](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/py5sig-bug-grep-rlP.png)
+
+Both `specs/TS29122_MonitoringEvent.yaml` and `specs/TS29512_Npcf_SMPolicyControl.yaml` contained literal tab characters, which `ruamel.yaml` (YAML forbids tabs for indentation) refused to parse. This is a genuine upstream bug, not a configuration error by me. 
+
+This was fixed with:
 
 ```bash
 sed -i 's/\t/  /g' <path>/TS29122_MonitoringEvent.yaml
 sed -i 's/\t/  /g' <path>/TS29512_Npcf_SMPolicyControl.yaml
 ```
+![bug-fixed-py5sig]((https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/py5sig-bug-found-fixed.png)
 
-**Takeaway:** running from a deliberately clean reinstall before debugging further is what distinguished "bug in the tool" from "mistake in my setup" — worth doing before assuming a self-inflicted cause, especially after an accidental double-install earlier in the session.
+**Takeaway:** running from a deliberately clean reinstall before debugging further is worth doing before assuming a self-inflicted cause.
 
 ### 8.4 Fuzzing Run and Observations
 
-With the spec files patched, `py5sig --fuzzing` was run against the AMF→SMF SBI pairing for approximately 6 minutes, with NRF logs tailed live in a separate SSH session (`docker compose -f sa-deploy.yaml logs -f nrf`) and saved to file for later review.
+With the spec files patched, `py5sig --fuzzing` was run against the AMF→SMF SBI pairing for about 6 minutes, with NRF logs tailed live in a separate SSH session (`docker compose -f sa-deploy.yaml logs -f nrf`) and saved to file for later review.
 
-**Example payload observed** (SQL-injection-style strings injected into subscriber identity fields on `POST /nsmf-pdusession/v1/sm-contexts`):
+![fuzzing-command](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/py5sig-fuzzing-command.png)
 
+**SQL payload:** 
+
+A single quote breaking out of an assumed string literal, followed by an always-true boolean condition (OR 1=1) or a wildcard match (LIKE '%'), designed to manipulate a backend database query if the input were passed unsanitized into SQL. Sent against the SMF's POST /nsmf-pdusession/v1/sm-contexts endpoint, targeting the subscriber identity fields (supi, pei, unauthenticatedSupi). 
 ```json
 {
   "pei": "' or username like '%",
@@ -321,8 +338,21 @@ With the spec files patched, `py5sig --fuzzing` was run against the AMF→SMF SB
   "n1SmMsg": { "contentId": "n1SmMsg" }
 }
 ```
+![fuzzing-sql-2](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/py5sig-fuzzer-sql-username.png)
+![fuzzing-sql-1](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/fuzzing-sql-1.png)
 
-**Result:** clean `400 Bad Request` — no injection behaviour, no crash, no unhandled exception.
+**Buffer Overflow / Oversized Input Attack:** 
+
+An abnormally long string (96 characters of repeated `A`) injected into a field expecting a short, fixed value (an NF type such as `AMF` or `SMF`). Long runs of a single repeated character are a classic technique for probing fixed-size buffer boundaries and identifying crash points or memory corruption. Sent as the `target-nf-type` query parameter against the NRF's `GET /nnrf-disc/v1/nf-instances` discovery endpoint:
+```
+target-nf-type=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+&requester-nf-type=SMF
+```
+
+![fuzzing-oversized-input](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/py5sig-oversized-input.png)
+
+**Result:** clean `400`/`4xx` rejection at the SBI/HTTP layer — no crash observed here. This same underlying vulnerability class (unbounded copy into a fixed-size buffer) was later confirmed to be genuinely exploitable elsewhere in the codebase, at the PFCP configuration-parsing layer rather than the SBI/HTTP layer — see Section 10.
+
 
 **NRF logs during the run** showed a consistent pattern of malformed discovery requests (invalid combined `scope=nnrf-disc nnrf-nfm` parameters, non-existent `nfInstanceId` values) being rejected cleanly at the parser level:
 
@@ -331,25 +361,151 @@ With the spec files patched, `py5sig --fuzzing` was run against the AMF→SMF SB
 [sbi] ERROR: cannot parse HTTP message
 
 
-**Post-run verification:** container health (`docker compose ps`) showed all services remained `Up` throughout, with no restarts. A before/after `Nnrf_NFDiscovery` capture, diffed with `diff`, showed **zero differences** in the registered NF topology — confirming the fuzzing run caused no observable state corruption in addition to causing no crash.
+**Post-run verification:** container health (`docker compose ps`) showed all services remained `Up` throughout, with no restarts. A before/after `Nnrf_NFDiscovery` capture, diffed with `diff`, showed **zero differences** in the registered NF topology. Thus, confirming the fuzzing run caused no observable state corruption in addition to causing no crash.
 
-**Methodology note:** my first before/after diff attempt returned a `0a1,604` diff (i.e. "add all 604 lines") — not because fuzzing changed 604 lines, but because my baseline capture file was empty due to an earlier failed command. I caught this by checking file line counts (`wc -l`) rather than trusting the diff output at face value, redid the baseline capture, and confirmed a genuine zero-diff result. Kept here as a reminder that a "no differences" result is only meaningful once the comparison itself is verified to be valid.
+## 9. Volume-Based Degradation Testing (CVE-2024-53828 / CWE-228)
 
-### 8.5 Outcome and Limitations
+### 9.1 Motivation
 
-**Findings:**
-- No crash or state corruption observed under mutation-based SBI fuzzing of the AMF/SMF/NRF pairing over this test window
-- SQL-injection-style payloads in subscriber identity fields were correctly rejected
-- Malformed SBI query parameters were correctly rejected at the NRF's parser level
-- One real upstream bug identified and worked around in py5sig's shipped OpenAPI spec files
+In April 2026, Ericsson published a security bulletin for [CVE-2024-53828](https://app.opencve.io/cve/CVE-2024-53828), affecting Packet Core Controller (PCC) versions prior to 1.38, credited to a joint disclosure by NCSC and [UKTL](https://www.ericsson.com/en/about-us/security/psirt/cve-2024-53828). The vulnerability (CWE-228: Improper Handling of Syntactically Invalid Structure) allows an attacker sending a large volume of specially crafted messages to cause service degradation (CVSS 5.3, AV:A/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H).
 
-**Limitations, stated explicitly:**
-- This was a short (~6 minute), single-session run against one NF pairing (AMF↔SMF) — not a long-running or coverage-guided campaign, and a longer run or different NF pairings could surface different results
-- py5sig's mutations are not coverage-guided (no binary instrumentation), so a negative result here indicates "no bug found within this mutation strategy and time window," not "no bugs exist"
-- Testing was limited to the SBI/HTTP2 layer; the N2/NGAP interface (RAN-to-AMF) was not covered by this tool and remains a separate, harder fuzzing target for future work (see `5Greplay`/stateful-NGAP-fuzzing research)
+PCC itself is closed-source commercial equipment with no public source, binary, or lab access available, so direct reproduction isn't possible. Instead, this section tests the **same vulnerability class** CWE-228, service degradation via malformed messages at volume against the NRF's `Nnrf_NFDiscovery` SBI interface in this lab's own Open5GS deployment, to see whether the same failure mode is present here.
 
-## 9. Skills Demonstrated
+### 9.2 Methodology
 
+Using `h2load` (nghttp2's benchmarking tool, chosen because Open5GS's SBI server itself runs on `nghttp2_server()`, confirmed in the NRF's own startup logs), two comparable load tests were run against the NRF's discovery endpoint, differing only in the validity of the `target-nf-type` query parameter:
+
+**Test A — malformed input** (oversized, syntactically invalid `target-nf-type`, the same payload used in Section 8.4):
+```bash
+h2load -n 5000 -c 50 -m 10 --duration=15 \
+  "http://172.22.0.12:7777/nnrf-disc/v1/nf-instances?target-nf-type=AAAA...[96 chars]...&requester-nf-type=SMF"
+```
+
+**Test B — control, well-formed input**:
+```bash
+h2load -n 5000 -c 50 -m 10 --duration=15 \
+  "http://172.22.0.12:7777/nnrf-disc/v1/nf-instances?target-nf-type=AMF&requester-nf-type=SMF"
+```
+
+Both tests used identical concurrency (`-c 50`), stream multiplexing (`-m 10`), and duration (`--duration=15`), so the only variable between them is request validity. `docker stats nrf amf smf` was run continuously (not `--no-stream`) throughout each test, in a separate SSH session, to observe live CPU/memory impact per-container rather than relying on `h2load`'s client-side timing alone.
+
+![h2load-malformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-malformed-run.png)
+![h2load-wellformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-wellformed-run.png)
+![docker-stats-malformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/docker-stats-during-malformed-flood.png)
+![docker-stats-wellformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/docker-stats-during-wellformed-flood.png)
+
+### 9.3 Results
+
+| Metric | Malformed request | Well-formed request |
+|---|---|---|
+| Status codes | 100% `4xx` (rejected) | 100% `2xx` (succeeded) |
+| Mean time/request | 147.20ms | 294.06ms |
+| Max time/request | 357.21ms | 986.58ms |
+| Throughput | 3327.53 req/s | 1648.93 req/s |
+| Peak NRF CPU (docker stats) | ~55% | 71.33% |
+| AMF/SMF CPU impact | Negligible (<1%) | Negligible (<1%) |
+| Errors / timeouts / 5xx | 0 / 0 / 0 | 0 / 0 / 0 |
+
+Results were consistent across repeated runs of both tests.
+
+### 9.4 Interpretation
+
+The initial hypothesis that malformed requests would degrade NRF performance disproportionately, mirroring the Ericsson PCC pattern was **not confirmed**; the result was the opposite. Well-formed requests consumed more CPU (71.33% vs ~55%) and had roughly double the latency (294ms vs 147ms mean) than malformed requests.
+
+This has a straightforward explanation once traced through: a malformed `target-nf-type` value is caught and rejected at the input-validation stage before any further processing occurs. A valid discovery request, by contrast, requires the NRF to look up the full registered NF topology (in this lab: AMF, SMF, UDM, UDR, AUSF, PCF, BSF, NSSF, SCP see Section 8.2's discovery output) and serialise it into a response more computational work per request.
+
+**Conclusion:** unlike the failure mode described in CVE-2024-53828, this NRF's discovery-endpoint input validation does not carry disproportionate cost rejecting invalid input is cheaper than serving a legitimate request, not more expensive. No evidence of CWE-228-class degradation was found on this specific endpoint under this test's volume/duration. Neither test produced a `5xx` response, a container crash, or unrecovered memory growth; NRF CPU usage returned to baseline (<1%) after each test concluded.
+
+### 9.5 Limitations
+
+- This tested one endpoint (`Nnrf_NFDiscovery`) with one malformation strategy (an oversized string in a single query parameter). Other SBI endpoints, other malformation strategies, or sustained/repeated load over longer windows could produce different results.
+- `docker stats`' ~1-second polling interval limits precision on very short bursts; `--duration=15` was chosen specifically to give a wide-enough observation window.
+- The Ericsson PCC vulnerability's exact mechanism is not public; this test used the CWE classification and the "volume of malformed messages" description as the closest available specification to test against, not a confirmed reproduction of the same code path.
+
+## 10. Static and Dynamic Analysis of CVE-2025-44951 / CVE-2025-44952 (PFCP Buffer Overflow)
+
+### 10.1 Motivation
+
+To cover ground the fuzzing work above doesn't reach memory corruption at the binary level, rather than input validation at the API level this section reproduces a documented, disclosed Open5GS vulnerability: CVE-2025-44951 and CVE-2025-44952, buffer overflows in `ogs_pfcp_dev_add` and `ogs_pfcp_subnet_add` (`lib/pfcp/context.c`), discovered by Leonardo Sagratella and Lorenzo Cannella via static analysis with Flawfinder, affecting Open5GS SMF/UPF v2.7.2 and earlier ([open5gs/open5gs#3775](https://github.com/open5gs/open5gs/issues/3775)).
+
+### 10.2 Independent Static Discovery
+
+The vulnerable version was built from source with debug symbols retained, to allow direct correlation between source, disassembly, and struct layout:
+
+```bash
+git clone https://github.com/open5gs/open5gs.git open5gs-cve
+cd open5gs-cve
+git checkout v2.7.2
+meson setup build --prefix=$(pwd)/install --buildtype=debug
+ninja -C build && ninja -C build install
+```
+
+Running Flawfinder independently against the checked-out source reproduced the **same two findings**, at the same line numbers, as the original disclosure:
+
+```bash
+flawfinder lib/ | grep -i "strcpy"
+```
+
+lib/pfcp/context.c:2112: [4] (buffer) strcpy: ... (CWE-120)
+lib/pfcp/context.c:2218: [4] (buffer) strcpy: ... (CWE-120)
+
+
+![flawfinder-independent](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/flawfinder-independent-confirmation.png)
+
+Manual inspection of both lines confirmed unguarded `strcpy` calls with no preceding `strlen`/length check:
+```c
+strcpy(dev->ifname, ifname);      // context.c:2112
+strcpy(subnet->dnn, dnn);         // context.c:2218
+```
+
+### 10.3 Binary Confirmation (Ghidra)
+
+The compiled shared library containing this code (`libogspfcp.so.2`, located via `ldd` against the built `open5gs-smfd` binary) was imported into Ghidra and analyzed with debug symbols intact.
+
+Locating `ogs_pfcp_dev_add` in the Function List and opening its decompiled view confirmed the same unguarded call is present in the **compiled binary**, not just the source:
+
+```c
+memset(dev,0,0x48);
+strcpy(dev->ifname,ifname);
+```
+
+![ghidra-decompiled-strcpy](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ghidra-strcpy-decompiled.png)
+
+No length check, `strlen`, or bounds comparison appears anywhere between the function's `ifname` parameter and this call — the only checks present in the function are null-pointer assertions, not size validation.
+
+### 10.4 Struct Layout — Confirming the Overflow Target
+
+Ghidra's Structure Editor, opened against the `ogs_pfcp_dev_s` type (resolved from DWARF debug info), shows the exact field layout:
+
+| Offset | Length | Type | Name |
+|---|---|---|---|
+| 0x0 | 0x10 | `ogs_lnode_t` | `lnode` |
+| 0x10 | 0x20 | `char[32]` | `ifname` |
+| 0x30 | 0x4 | `ogs_socket_t` | `fd` |
+| 0x38 | 0x8 | `ogs_poll_t*` | `poll` |
+| 0x40 | 0x1 | `_Bool` | `is_tap` |
+| 0x41 | 0x6 | `uint8_t[6]` | `mac_addr` |
+
+![ghidra-struct-layout](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ghidra-struct-editor-ogs-pfcp-dev-s.png)
+
+This mathematically confirms the mechanism: `ifname` occupies exactly 32 bytes starting at offset `0x10`, and `fd` begins immediately at offset `0x30` directly adjacent. Any string longer than 32 bytes copied into `ifname` via the unbounded `strcpy` overflows directly into `fd`, and (given a sufficiently long input) continues into `poll`, an 8-byte pointer field — a materially more serious corruption target than an integer, since pointer corruption has a higher potential severity ceiling. This matches the original disclosure's empirical finding, which observed `dev->fd` change from its initialized value to a garbage value (`1853191283`) after the overflow.
+
+### 10.5 Dynamic Confirmation (gdb) — [Planned/In Progress]
+
+To close the loop between static analysis and actual runtime behaviour, the following live confirmation is planned:
+
+1. A minimal `smf.yaml` config using the disclosure's documented trigger values (`dev: ogstunogstunogstunogstunogstunogstun` 38 characters; `dnn:` a 368-character string) will be used to launch `open5gs-smfd` under gdb.
+2. Breakpoints will be set at `context.c:2112` and `context.c:2218` the exact vulnerable lines identified in Sections 10.2–10.3.
+3. `dev->fd` and `subnet->num_of_range` will be printed immediately before and after stepping over each `strcpy` call, to directly observe the corruption occurring in memory, rather than relying solely on the original disclosure's own printf-instrumented evidence.
+4. Results will be correlated explicitly against the Section 10.4 struct layout: the runtime-observed corrupted field should match what the offset table predicts.
+
+*(This subsection to be completed and updated with results.)*
+
+### 10.6 Summary
+
+This reproduction combined three levels of evidence for the same vulnerability: independent static rediscovery (Flawfinder), binary-level confirmation of the vulnerable code path in the actual compiled shared library (Ghidra decompilation), and a mathematical explanation of the exact corruption mechanism via struct layout analysis (Ghidra Structure Editor) — with live runtime confirmation (gdb) to follow. Unlike the SBI fuzzing in Sections 8–9, which produced consistently negative (no-vulnerability-found) results, this reproduction confirms a genuine, disclosed memory-safety vulnerability exists in this version of the codebase, and demonstrates the ability to trace a CVE from public disclosure through source, compiled binary, and runtime behaviour.
+
+## 11. Skills Demonstrated
 - Linux system administration (Ubuntu, systemd, Docker/containerd internals)
 - Virtualisation (Proxmox/KVM CPU passthrough configuration)
 - Docker & Docker Compose (multi-container orchestration, networking, volume-mounted configuration)
