@@ -488,20 +488,38 @@ Ghidra's Structure Editor, opened against the `ogs_pfcp_dev_s` type (resolved fr
 
 This mathematically confirms the mechanism: `ifname` occupies exactly 32 bytes starting at offset `0x10`, and `fd` begins immediately at offset `0x30` directly adjacent. Any string longer than 32 bytes copied into `ifname` via the unbounded `strcpy` overflows directly into `fd`, and (given a sufficiently long input) continues into `poll`, an 8-byte pointer field — a materially more serious corruption target than an integer, since pointer corruption has a higher potential severity ceiling. This matches the original disclosure's empirical finding, which observed `dev->fd` change from its initialized value to a garbage value (`1853191283`) after the overflow.
 
-### 10.5 Dynamic Confirmation (gdb) — [Planned/In Progress]
 
-To close the loop between static analysis and actual runtime behaviour, the following live confirmation is planned:
+### 10.5 Dynamic Confirmation (gdb)
 
-1. A minimal `smf.yaml` config using the disclosure's documented trigger values (`dev: ogstunogstunogstunogstunogstunogstun` 38 characters; `dnn:` a 368-character string) will be used to launch `open5gs-smfd` under gdb.
-2. Breakpoints will be set at `context.c:2112` and `context.c:2218` the exact vulnerable lines identified in Sections 10.2–10.3.
-3. `dev->fd` and `subnet->num_of_range` will be printed immediately before and after stepping over each `strcpy` call, to directly observe the corruption occurring in memory, rather than relying solely on the original disclosure's own printf-instrumented evidence.
-4. Results will be correlated explicitly against the Section 10.4 struct layout: the runtime-observed corrupted field should match what the offset table predicts.
+To close the loop between static analysis and actual runtime behaviour, both vulnerable functions were confirmed live under gdb, using a minimal SMF configuration containing the disclosure's documented trigger values (`dev: ogstunogstunogstunogstunogstunogstun` — 38 characters; a 368-character `dnn` value).
 
-*(This subsection to be completed and updated with results.)*
+**Approach:** rather than letting the program run freely, breakpoints were set directly on the two vulnerable functions by name (`ogs_pfcp_dev_add`, `ogs_pfcp_subnet_add`), so execution would pause automatically at the exact moment each function was entered — before either `strcpy` call had run. From that paused state, the relevant struct field was inspected, then a single instruction was stepped forward (`next`), and the same field was inspected again. Comparing the two readings directly shows whether — and how — that specific instruction changed memory it had no business touching.
+
+**Confirming the setup was correct:** before trusting any result, the actual value being passed into each function was checked explicitly (`x/s ifname`), rather than assuming the config file's intent had translated correctly into the running process. This step mattered in practice — an early attempt showed `ifname` holding only the six-character default `"ogstun"` rather than the intended 38-character trigger string, because the `dev` field had been placed under the wrong section of the config (`pfcp.server` rather than the `session` block). Recognising and correcting this before drawing any conclusion from the (correctly unremarkable) result avoided a false negative.
+
+**Result 1 — `ogs_pfcp_dev_add` / `dev->fd`:**
+
+| State | Value |
+|---|---|
+| Before `strcpy` | `0x0` |
+| After `strcpy` | `0x6e757473` |
+
+`0x6e757473`, read as ASCII bytes, spells `"tunl"` — the tail end of the 38-character `"ogstun..."` string overflowing past the 32-byte `ifname` buffer and landing directly in the adjacent `fd` field, exactly as the struct layout in Section 10.4 predicted.
+
+**Result 2 — `ogs_pfcp_subnet_add` / `subnet->num_of_range`:**
+
+| State | Value |
+|---|---|
+| Before `strcpy` | `0x0` |
+| After `strcpy` | `0x65746e69` |
+
+Decoded, `0x65746e69` reads `"inte"` — the beginning of the repeated `"internet"` string used in the oversized `dnn` value, again matching the mechanism the original disclosure described.
+
+**What this demonstrates:** the correlation between static and dynamic evidence is the actual point of this exercise, not the crash itself. Ghidra's structure editor (Section 10.4) predicted, from the binary's memory layout alone, that overflowing `ifname` would specifically corrupt `fd`, the field immediately adjacent to it — with no need to run the program at all. gdb then confirmed that prediction was correct, live, twice: once per vulnerable function, in both cases producing a corrupted value that is directly traceable — byte for byte — back to the attacker-controlled input string. This is the difference between "the code looks unsafe" and "the code is unsafe, and here is precisely what it does when triggered."
 
 ### 10.6 Summary
 
-This reproduction combined three levels of evidence for the same vulnerability: independent static rediscovery (Flawfinder), binary-level confirmation of the vulnerable code path in the actual compiled shared library (Ghidra decompilation), and a mathematical explanation of the exact corruption mechanism via struct layout analysis (Ghidra Structure Editor) — with live runtime confirmation (gdb) to follow. Unlike the SBI fuzzing in Sections 8–9, which produced consistently negative (no-vulnerability-found) results, this reproduction confirms a genuine, disclosed memory-safety vulnerability exists in this version of the codebase, and demonstrates the ability to trace a CVE from public disclosure through source, compiled binary, and runtime behaviour.
+This reproduction combined three levels of evidence for the same vulnerability: independent static rediscovery (Flawfinder), binary-level confirmation of the vulnerable code path in the actual compiled shared library (Ghidra decompilation), a mathematical explanation of the exact corruption mechanism via struct layout analysis (Ghidra Structure Editor), and finally live runtime confirmation (gdb) showing the predicted corruption occurring exactly as expected, in both vulnerable functions. Unlike the SBI fuzzing in Sections 8–9, which produced consistently negative (no-vulnerability-found) results, this reproduction confirms a genuine, disclosed memory-safety vulnerability exists in this version of the codebase, and demonstrates the ability to trace a CVE from public disclosure through source, compiled binary, and runtime behaviour — using each tool to check and confirm what the others suggested, rather than relying on any single one in isolation.
 
 ## 11. Skills Demonstrated
 - Linux system administration (Ubuntu, systemd, Docker/containerd internals)
