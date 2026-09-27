@@ -1,10 +1,11 @@
+
 # Containerised 5G Standalone 
 
-A self-directed lab project deploying a full 5G Standalone network in Docker, using Open5GS and UERANSIM, on a Proxmox-hosted Ubuntu VM. Built to develop familiarity with 5G Core architecture (SBA, NGAP, PFCP, GTP-U) and to practice systematic debugging of a multi-component containerised system.
+A self-directed lab project deploying a full 5G Standalone network in Docker, using Open5GS and UERANSIM, on a Proxmox-hosted Ubuntu VM. Built to develop familiarity with 5G Core architecture and to practice finding vulnerabilities while systematically debugging a containerised system.
 
 ## 1. Motivation
 
-This project was built to gain exposure to the technologies referenced in UKTL Associate Security and Privacy Researcher vacancy that uses 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux based container operations. The goal was to get a working deployment and more importantly understand why each component behaves the way it does while documenting the debugging process.
+This project was built to gain exposure to the technologies referenced in a vacancy that uses 5G Service-Based Architecture, NGAP/SCTP signalling, and Linux based container operations. The goal was to get a working deployment and more importantly understand why each component behaves the way it does while documenting the debugging process.
 
 ## 2. Architecture
 
@@ -163,7 +164,7 @@ sctp || ngap || pfcp || gtpv2
 
 ### 6.2 Key fields inspected
 
-**InitialUEMessage** protocol IEs (packet 2809): `RAN-UE-NGAP-ID`, `NAS-PDU`, `UserLocationInformation`, `RRCEstablishmentCause`, `UEContextRequest` — confirming the message structure matches the 3GPP NGAP specification for this procedure.
+**InitialUEMessage** protocol IEs (packet 2809): `RAN-UE-NGAP-ID`, `NAS-PDU`, `UserLocationInformation`, `RRCEstablishmentCause`, `UEContextRequest` confirming the message structure matches the 3GPP NGAP specification for this procedure.
 
 ![longshot-wireshark.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-long-wireshark.png)
 ![longshot-wireshark-2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/InitialEUMessage-long-wireshark-2.png)
@@ -172,10 +173,10 @@ sctp || ngap || pfcp || gtpv2
 
 **PFCP Session Establishment Request** (packet 3223) — this is the message SMF sends to instruct UPF to set up a new data session. Decoding it showed:
 
-- Subscriber identity fields — `IMSI 001011234567895`, `IMEI`, `MCC/MNC (001/01)` — carried in the PFCP User ID Information Element. This confirms SMF isn't just telling UPF what to do with the traffic, it's also telling UPF whose traffic this is. Checking this against 3GPP TS 29.244 spec confirmed this is a legitimate field though the spec marks it as optional and controlled by a defined policy so that UP function must be in a trusted environment before containing `User ID`. Open5GS enables it by default.
-- `APN/DNN: internet`, `S-NSSAI: SST 01, SD ffffff` — confirms the session's network slice and access point identity travel with it, so UPF knows not just who the subscriber is but what kind of session and slice they're connecting through.
+- Subscriber identity fields `IMSI 001011234567895`, `IMEI`, `MCC/MNC (001/01)` carried in the PFCP User ID Information Element. This confirms SMF isn't just telling UPF what to do with the traffic, it's also telling UPF whose traffic this is. Checking this against 3GPP TS 29.244 spec confirmed this is a legitimate field though the spec marks it as optional and controlled by a defined policy so that UP function must be in a trusted environment before containing `User ID`. Open5GS enables it by default.
+- `APN/DNN: internet`, `S-NSSAI: SST 01, SD ffffff` confirms the session's network slice and access point identity travel with it, so UPF knows not just who the subscriber is but what kind of session and slice they're connecting through.
 - `Create PDR / FAR / URR / QER / BAR`— the actual forwarding rules: how UPF should detect the UE's packets (PDR), where to forward them (FAR), how to measure usage (URR), how to police/rate-limit (QER), and how to buffer them if needed (BAR).
-- `F-SEID` — the unique session ID binding this specific PFCP session between SMF and UPF, so future messages about this session can reference it unambiguously.
+- `F-SEID` the unique session ID binding this specific PFCP session between SMF and UPF, so future messages about this session can reference it unambiguously.
 
 Significance: this confirmed, at the packet level, that subscriber and slice context go through through the core's internal signalling (SMF→UPF) not only at the RAN-facing edge where the UE first presents its identity to the AMF. Identity and context don't just enter the network once at the entrance, they are actively carried between internal network functions as the session is built.
 
@@ -188,7 +189,7 @@ Periodic `PFCP Heartbeat Request/Response` (SMF↔UPF) and `SCTP HEARTBEAT/HEART
 
 ## 7. SOC Tooling Integration (Wazuh + Custom Log Parser)
 
-To extend the project beyond protocol analysis and into a security monitoring context, a Wazuh agent was deployed and pointed at the lab, with a custom [Python analyser](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Automation/Log-parser.md) used to process the resulting alert stream.
+To extend the project beyond protocol analysis and into a security monitoring context, a Wazuh agent was deployed and pointed at the lab, with a custom [log analyser](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Automation/Log-parser.md) used to process the resulting alert stream.
 
 ### 7.1 Deployment
 
@@ -295,8 +296,6 @@ ruamel.yaml.scanner.ScannerError: while scanning for the next token
 found character '\t' that cannot start any token
 in "<unicode string>", line 1081, column 18
 
-![py5sig-bus-output](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-09-20%2015-16-20.png)
-
 A clean reinstall (fresh venv, fresh `pip install .`) reproduced the identical crash, ruling out a local environment issue. 
 
 I located the fault in two of its bundled 3GPP OpenAPI spec files by using:
@@ -347,9 +346,9 @@ target-nf-type=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 &requester-nf-type=SMF
 ```
 
-![fuzzing-oversized-input](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/py5sig-oversized-input.png)
+![fuzzing-oversized-input](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-oversized-input.png)
 
-**Result:** clean `400`/`4xx` rejection at the SBI/HTTP layer — no crash observed here. This same underlying vulnerability class (unbounded copy into a fixed-size buffer) was later confirmed to be genuinely exploitable elsewhere in the codebase, at the PFCP configuration-parsing layer rather than the SBI/HTTP layer — see Section 10.
+**Result:** clean `400`/`4xx` rejection at the SBI/HTTP layer, no crash. This same underlying vulnerability class (unbounded copy into a fixed-size buffer) was later confirmed to be genuinely exploitable elsewhere in the codebase, at the PFCP configuration-parsing layer rather than the SBI/HTTP layer.
 
 
 **NRF logs during the run** showed a consistent pattern of malformed discovery requests (invalid combined `scope=nnrf-disc nnrf-nfm` parameters, non-existent `nfInstanceId` values) being rejected cleanly at the parser level:
@@ -376,7 +375,7 @@ Using `h2load` (nghttp2's benchmarking tool, chosen because Open5GS's SBI server
 **Test A — malformed input** (oversized, syntactically invalid `target-nf-type`, the same payload used in Section 8.4):
 ```bash
 h2load -n 5000 -c 50 -m 10 --duration=15 \
-  "http://172.22.0.12:7777/nnrf-disc/v1/nf-instances?target-nf-type=AAAA...[96 chars]...&requester-nf-type=SMF"
+  "http://172.22.0.12:7777/nnrf-disc/v1/nf-instances?target-nf-type=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&requester-nf-type=SMF"
 ```
 
 **Test B — control, well-formed input**:
@@ -387,10 +386,9 @@ h2load -n 5000 -c 50 -m 10 --duration=15 \
 
 Both tests used identical concurrency (`-c 50`), stream multiplexing (`-m 10`), and duration (`--duration=15`), so the only variable between them is request validity. `docker stats nrf amf smf` was run continuously (not `--no-stream`) throughout each test, in a separate SSH session, to observe live CPU/memory impact per-container rather than relying on `h2load`'s client-side timing alone.
 
-![h2load-malformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-malformed-run.png)
-![h2load-wellformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-wellformed-run.png)
-![docker-stats-malformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/docker-stats-during-malformed-flood.png)
-![docker-stats-wellformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/docker-stats-during-wellformed-flood.png)
+![h2load-wellformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-wellformed-duration-15.png)
+![docker-stats-malformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-malformed-CPU-usage.png)
+![docker-stats-wellformed](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/h2load-wellformed-CPU-usage.png)
 
 ### 9.3 Results
 
@@ -444,13 +442,16 @@ Running Flawfinder independently against the checked-out source reproduced the *
 flawfinder lib/ | grep -i "strcpy"
 ```
 
+![flawfinder-independent](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/flawfinder-strcpy-open5gs.png)
+
 lib/pfcp/context.c:2112: [4] (buffer) strcpy: ... (CWE-120)
 lib/pfcp/context.c:2218: [4] (buffer) strcpy: ... (CWE-120)
 
-
-![flawfinder-independent](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/flawfinder-independent-confirmation.png)
-
 Manual inspection of both lines confirmed unguarded `strcpy` calls with no preceding `strlen`/length check:
+
+![manual-strcpy-dev](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/strcpy-dev-ifname.png)
+![manual-strpcpy-dnn](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/strcpy-subnet-dnn.png)
+
 ```c
 strcpy(dev->ifname, ifname);      // context.c:2112
 strcpy(subnet->dnn, dnn);         // context.c:2218
@@ -467,13 +468,15 @@ memset(dev,0,0x48);
 strcpy(dev->ifname,ifname);
 ```
 
-![ghidra-decompiled-strcpy](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ghidra-strcpy-decompiled.png)
+![ghidra-decompiled-strcpy](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/decompiler-strcpy-dev.png)
 
-No length check, `strlen`, or bounds comparison appears anywhere between the function's `ifname` parameter and this call — the only checks present in the function are null-pointer assertions, not size validation.
+No length check, `strlen`, or bounds comparison appears anywhere between the function's `ifname` parameter and this call the only checks present in the function are null-pointer assertions, not size validation.
 
 ### 10.4 Struct Layout — Confirming the Overflow Target
 
 Ghidra's Structure Editor, opened against the `ogs_pfcp_dev_s` type (resolved from DWARF debug info), shows the exact field layout:
+
+![edit-data-structure.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/editng-data-types-decompiler-ghidra.png)
 
 | Offset | Length | Type | Name |
 |---|---|---|---|
@@ -484,18 +487,23 @@ Ghidra's Structure Editor, opened against the `ogs_pfcp_dev_s` type (resolved fr
 | 0x40 | 0x1 | `_Bool` | `is_tap` |
 | 0x41 | 0x6 | `uint8_t[6]` | `mac_addr` |
 
-![ghidra-struct-layout](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ghidra-struct-editor-ogs-pfcp-dev-s.png)
+![ghidra-struct-layout](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/ghidra-buffer-overflow-chart.png)
 
-This mathematically confirms the mechanism: `ifname` occupies exactly 32 bytes starting at offset `0x10`, and `fd` begins immediately at offset `0x30` directly adjacent. Any string longer than 32 bytes copied into `ifname` via the unbounded `strcpy` overflows directly into `fd`, and (given a sufficiently long input) continues into `poll`, an 8-byte pointer field — a materially more serious corruption target than an integer, since pointer corruption has a higher potential severity ceiling. This matches the original disclosure's empirical finding, which observed `dev->fd` change from its initialized value to a garbage value (`1853191283`) after the overflow.
+This mathematically confirms the mechanism: `ifname` occupies exactly 32 bytes starting at offset `0x10`, and `fd` begins immediately at offset `0x30` directly adjacent. Any string longer than 32 bytes copied into `ifname` via the unbounded `strcpy` overflows directly into `fd`, and (given a sufficiently long input) continues into `poll`, an 8-byte pointer field a materially more serious corruption target than an integer, since pointer corruption has a higher potential severity ceiling. This matches the original disclosure's empirical finding, which observed `dev->fd` change from its initialized value to a garbage value (`1853191283`) after the overflow.
 
 
 ### 10.5 Dynamic Confirmation (gdb)
 
-To close the loop between static analysis and actual runtime behaviour, both vulnerable functions were confirmed live under gdb, using a minimal SMF configuration containing the disclosure's documented trigger values (`dev: ogstunogstunogstunogstunogstunogstun` — 38 characters; a 368-character `dnn` value).
+To close the loop between static analysis and actual runtime behaviour, both vulnerable functions were confirmed live under gdb, using a minimal SMF configuration containing the disclosure's documented trigger values (`dev: ogstunogstunogstunogstunogstunogstun` 38 characters; a 368-character `dnn` value).
 
-**Approach:** rather than letting the program run freely, breakpoints were set directly on the two vulnerable functions by name (`ogs_pfcp_dev_add`, `ogs_pfcp_subnet_add`), so execution would pause automatically at the exact moment each function was entered — before either `strcpy` call had run. From that paused state, the relevant struct field was inspected, then a single instruction was stepped forward (`next`), and the same field was inspected again. Comparing the two readings directly shows whether — and how — that specific instruction changed memory it had no business touching.
+![smf-yaml-buffer-overflow](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/smf.yaml-buffer-overflow-nano.png)
 
-**Confirming the setup was correct:** before trusting any result, the actual value being passed into each function was checked explicitly (`x/s ifname`), rather than assuming the config file's intent had translated correctly into the running process. This step mattered in practice — an early attempt showed `ifname` holding only the six-character default `"ogstun"` rather than the intended 38-character trigger string, because the `dev` field had been placed under the wrong section of the config (`pfcp.server` rather than the `session` block). Recognising and correcting this before drawing any conclusion from the (correctly unremarkable) result avoided a false negative.
+
+**Approach:** rather than letting the program run freely, breakpoints were set directly on the two vulnerable functions by name (`ogs_pfcp_dev_add`, `ogs_pfcp_subnet_add`), so execution would pause automatically at the exact moment each function was entered before either `strcpy` call had run. A breakpoint tells gdb when execution reaches this exact line, pause and hand control to me. Because my binary was built with debug symbols ```--buildtype=debug ```, gdb can map these human-readable ```file:line``` references directly to the actual machine instructions, rather than needing to know raw memory addresses. From that paused state, the relevant field was inspected, then a single instruction was stepped forward (`next`), and the same field was inspected again. Comparing the two readings directly shows whether and how that specific instruction changed memory it had no business touching.
+
+**Confirming the setup was correct:** before trusting any result, the actual value being passed into each function was checked explicitly (`x/s ifname`), rather than assuming the config file's intent had translated correctly into the running process. This step mattered in practice an early attempt showed `ifname` holding only the six-character default `"ogstun"` rather than the intended 38-character trigger string, because the `dev` field had been placed under the wrong section of the config (`pfcp.server` rather than the `session` block). Recognising and correcting this before drawing any conclusion from the (correctly unremarkable) result avoided a false negative.
+
+![break-info-gdb](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/break-info-gdb-open5gs.png)
 
 **Result 1 — `ogs_pfcp_dev_add` / `dev->fd`:**
 
@@ -504,7 +512,10 @@ To close the loop between static analysis and actual runtime behaviour, both vul
 | Before `strcpy` | `0x0` |
 | After `strcpy` | `0x6e757473` |
 
-`0x6e757473`, read as ASCII bytes, spells `"tunl"` — the tail end of the 38-character `"ogstun..."` string overflowing past the 32-byte `ifname` buffer and landing directly in the adjacent `fd` field, exactly as the struct layout in Section 10.4 predicted.
+![gdb-dev.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/gdb-before-dev-ifname.png)
+![gdb-after-dnn.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/gdb-after-dev-ifname.png)
+
+`0x6e757473`, read as ASCII bytes, spells `"tunl"` the tail end of the 38-character `"ogstun..."` string overflowing past the 32-byte `ifname` buffer and landing directly in the adjacent `fd` field, exactly as the struct layout in Section 10.4 predicted.
 
 **Result 2 — `ogs_pfcp_subnet_add` / `subnet->num_of_range`:**
 
@@ -513,13 +524,24 @@ To close the loop between static analysis and actual runtime behaviour, both vul
 | Before `strcpy` | `0x0` |
 | After `strcpy` | `0x65746e69` |
 
+![gdb-before-dnn.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/gdb-before-dnn.png)
+![gdb-after-dnn.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/gdb-after-dnn.png)
+
 Decoded, `0x65746e69` reads `"inte"` — the beginning of the repeated `"internet"` string used in the oversized `dnn` value, again matching the mechanism the original disclosure described.
 
-**What this demonstrates:** the correlation between static and dynamic evidence is the actual point of this exercise, not the crash itself. Ghidra's structure editor (Section 10.4) predicted, from the binary's memory layout alone, that overflowing `ifname` would specifically corrupt `fd`, the field immediately adjacent to it — with no need to run the program at all. gdb then confirmed that prediction was correct, live, twice: once per vulnerable function, in both cases producing a corrupted value that is directly traceable — byte for byte — back to the attacker-controlled input string. This is the difference between "the code looks unsafe" and "the code is unsafe, and here is precisely what it does when triggered."
+**What this demonstrates:** the correlation between static and dynamic evidence is the actual point of this exercise, not the crash itself. Ghidra's structure editor (Section 10.4) predicted, from the binary's memory layout alone, that overflowing `ifname` would specifically corrupt `fd`, the field immediately adjacent to it with no need to run the program at all. gdb then confirmed that prediction was correct, live, twice: once per vulnerable function, in both cases producing a corrupted value that is directly traceable byte for byte back to the attacker-controlled input string. This is the difference between "the code looks unsafe" and "the code is unsafe, and here is precisely what it does when triggered."
+
+
+### The Fix
+
+To fix the use of an unbounded ```strcpy``` I looked at what the corrected version uses and edited my own context.c file.
+
+![correcting-strcpy-manual-dev](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/correcting-strcpy-manually-dev-ifname.png)
+![correcting-strcpy-manual](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/correcting-strcpy-manually.png)
 
 ### 10.6 Summary
 
-This reproduction combined three levels of evidence for the same vulnerability: independent static rediscovery (Flawfinder), binary-level confirmation of the vulnerable code path in the actual compiled shared library (Ghidra decompilation), a mathematical explanation of the exact corruption mechanism via struct layout analysis (Ghidra Structure Editor), and finally live runtime confirmation (gdb) showing the predicted corruption occurring exactly as expected, in both vulnerable functions. Unlike the SBI fuzzing in Sections 8–9, which produced consistently negative (no-vulnerability-found) results, this reproduction confirms a genuine, disclosed memory-safety vulnerability exists in this version of the codebase, and demonstrates the ability to trace a CVE from public disclosure through source, compiled binary, and runtime behaviour — using each tool to check and confirm what the others suggested, rather than relying on any single one in isolation.
+This reproduction combined three levels of evidence for the same vulnerability: independent static rediscovery (Flawfinder), binary-level confirmation of the vulnerable code path in the actual compiled shared library (Ghidra decompilation), a mathematical explanation of the exact corruption mechanism via struct layout analysis (Ghidra Structure Editor), and finally live runtime confirmation (gdb) showing the predicted corruption occurring exactly as expected, in both vulnerable functions. Unlike the SBI fuzzing in Sections 8–9, which produced consistently negative (no-vulnerability-found) results, this reproduction confirms a genuine, disclosed memory-safety vulnerability exists in this version of the codebase, and demonstrates the ability to trace a CVE from public disclosure through source, compiled binary, and runtime behaviour using each tool to check and confirm what the others suggested, rather than relying on any single one in isolation.
 
 ## 11. Skills Demonstrated
 - Linux system administration (Ubuntu, systemd, Docker/containerd internals)
