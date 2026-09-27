@@ -552,8 +552,6 @@ This reproduction combined three levels of evidence for the same vulnerability: 
 - SOC tooling: Wazuh manager/agent deployment, Security Configuration Assessment, File Integrity Monitoring configuration
 - Custom Python tooling for security log parsing and MITRE ATT&CK-mapped reporting
 - Systematic debugging: isolating root cause across OS, virtualisation, application-config, and data-entry layers
-- Verifying assumptions against primary/upstream sources rather than trusting first plausible explanations
 - Fuzz testing methodology: SBI/HTTP2 mutation fuzzing, oracle design (crash detection, topology-diff verification), and honestly scoping findings against limitations
 - HTTP/2 cleartext (h2c) protocol debugging, distinguishing transport-layer, TLS-layer, and API-layer failure modes
 - Identifying, isolating, and working around a bug in third-party open-source security tooling
-- Self-correcting a flawed verification step (invalid baseline diff) before drawing conclusions from it
