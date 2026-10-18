@@ -39,7 +39,7 @@ crackmapexec smb 10.0.0.1/24 -u users_AD.txt -p "Winter2024" --continue-on-succe
 A few low-value accounts caught the weak passwords immediately. One hit mattered far more: the `labadmin` account authenticated successfully against a separate candidate password. That single working credential is what turned the rest of this chain from "guessing" into domain access.
 
 **Why this works:** password spraying tries one password against *many* accounts instead of many passwords against one, avoiding per-account lockout thresholds. It only takes one weak or reused password in a large user list to get a foothold.
-
+![password-spray2.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-10-18%2016-41-51.png)
 ![password-spray.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Potential-password-spraying.png)
 
 ## Credential Access: Dumping the Local SAM
