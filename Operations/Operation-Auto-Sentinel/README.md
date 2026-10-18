@@ -222,5 +222,5 @@ I applied similar logic to the password spray rule, but tuned differently: rathe
 | T1087.002 | Discovery | Guest account enumerates SMB users |
 | T1558.003 | Credential Access | RC4 TGS requested for `Kerberoast` account |
 | T1003.006 | Credential Access | `Get-ADReplAccount` pulls `krbtgt` and `Kerberoast` secrets |
-| T1550.002 | Lateral Movement | Pass-the-hash attempted against `labadmin@10.0.0.101` |
+| T1550.002 | Lateral Movement | Pass-the-hash attempted against `Guest@10.0.0.1/24` |
 | T1021.002 | Lateral Movement | `psexec.py` execution attempt (failed) |
