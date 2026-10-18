@@ -1,4 +1,4 @@
-## Operation Auto-Sentinel]: Credential Harvesting & Domain Secrets Extraction
+## Operation Auto-Sentinel: Credential Harvesting & Domain Secrets Extraction
 
 A simulated Active Directory attack chain demonstrating detection via Microsoft Sentinel and KQL, mapped to MITRE ATT&CK. Built in a domain-joined lab to replicate a realistic AD attack path from an unauthenticated foothold through password spraying, local credential dumping, Kerberoasting, and domain secrets replication.
 
