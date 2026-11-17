@@ -147,7 +147,7 @@ systemctl restart wazuh-agent
 
 #### Step 3: Add Custom Rules
 
-For all custom rules view the [Custom-Detection-Rules](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Custom-Detection-Rules.md) section.
+For all custom rules view the [Custom-Detection-Rules](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Custom_Rules/Wazuh_Custom_Rules.xml) section.
 
 
 Add these to /var/ossec/etc/rules/local_rules.xml on the Wazuh manager:
