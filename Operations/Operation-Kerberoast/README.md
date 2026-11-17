@@ -128,7 +128,7 @@ Triage
 
 ## Remediation
 
-Force the Kerberoast account to AES-only encryption (Set-ADUser Kerberoast -KerberosEncryptionType AES256) 0x12 instead of 0x17 and that rule 110300 correctly does not fire on it, since the RC4 weakness it targets no longer exists. This demonstrates the rule is precise to the actual risk indicator rather than alerting on ticket requests generally.
+Force the Kerberoast account to AES-only encryption (Set-ADUser Kerberoast -KerberosEncryptionType AES256) so that rule 110300 correctly does not fire, since the RC4 weakness it targets no longer exists. This demonstrates the rule is precise to the actual risk indicator rather than alerting on ticket requests generally.
 
 ## Kill Chain Timeline
 |	MITRE ID	| Phase	| Detection |
