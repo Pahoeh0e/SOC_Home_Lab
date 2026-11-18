@@ -84,7 +84,7 @@ Get-ADReplAccount -SamAccountName "kerberoast" -Domain "SOC" -Server "10.0.0.101
 
 This returned full credential material for both accounts including NT hashes and the Kerberos encryption keys used to sign tickets.
 
-**Why this matters more than anything else in the chain:** `krbtgt` is the account that signs *every* Kerberos ticket in the domain. Getting its key material is effectively over for the domain it's what attackers need to forge Golden Tickets that impersonate any user, indefinitely, until the `krbtgt` password is rotated (twice, due to password history). This kind of query normally requires Directory Replication rights. In a real environment, seeing this succeed from a non-Domain-Admin account would be a critical finding on its own.
+**Why this matters more than anything else in the chain:** `krbtgt` is the account that signs *every* Kerberos ticket in the domain. Getting its key material is effectively over for the domain, it's what attackers need to forge Golden Tickets that impersonate any user, indefinitely, until the `krbtgt` password is rotated (twice, due to password history). This kind of query normally requires Directory Replication rights. In a real environment, seeing this succeed from a non-Domain-Admin account would be a critical finding on its own.
 
 ![dsinternals-krbtgt.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-10-14%2020-37-51.png)
 
