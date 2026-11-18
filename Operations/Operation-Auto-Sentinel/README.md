@@ -69,7 +69,7 @@ Using the `labadmin` credentials, I requested a Kerberos service ticket for the 
 impacket-GetUserSPNs soc.lab/labadmin:'xxxxxxxx' -request -dc-ip 10.0.0.101
 ```
 
-Because the KDC encrypts that ticket with a key derived from the service account's own password, this hands back a crackable hash, no exploit required, just normal Kerberos behavior pointed at a weak account. (Full background on this technique, including offline cracking with Hashcat, is in my earlier [Kerberoasting writeup](link-to-repo)).
+Because the KDC encrypts that ticket with a key derived from the service account's own password, this hands back a crackable hash, no exploit required, just normal Kerberos behavior pointed at a weak account. (Full background on this technique, including offline cracking with Hashcat, is in my earlier [Kerberoasting writeup](https://github.com/Pahoeh0e/SOC_Home_Lab/tree/main/Operations/Operation-Kerberoast).
 
 ![kerberoast-request.png](https://github.com/Pahoeh0e/SOC_Home_Lab/blob/main/Operations/Screenshots/Screenshot%20from%202026-10-14%2020-08-35.png)
 
